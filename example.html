@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>PixiJS v8 global zIndex (zOrder) example</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+        }
+
+        #app {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+
+    </div>
+    <script type="text/javascript" src="pixijs/pixi.min.js"></script>
+    <script type="text/javascript">
+        const element = document.getElementById("app")
+        const app = new PIXI.Application();
+        let sprite1, sprite2;
+
+        const initialize = async () => {
+            await app.init({
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+                width: element.clientWidth,
+                height: element.clientHeight,
+                antialias: false,
+                premultipliedAlpha: false,
+                backgroundAlpha: 1,
+                backgroundColor: 0x000000,
+                resizeTo: element,
+                clearBeforeRender: true,
+                hello: true,
+                powerPreference: "high-performance",
+                roundPixels: true
+            });
+
+            element.appendChild(app.canvas);
+
+            const texture = await PIXI.Assets.load('image.png');
+
+            sprite1 = new PIXI.Sprite(texture);
+            sprite2 = new PIXI.Sprite(texture);
+
+            const sceneRoot = new PIXI.Container();
+            const container1 = new PIXI.Container();
+            const container2 = new PIXI.Container();
+
+            sceneRoot.addChild(container1);
+            sceneRoot.addChild(container2);
+            app.stage.addChild(sceneRoot);
+
+            container1.addChild(sprite1);
+            container2.addChild(sprite2);
+
+            sprite1.zOrder = 2;
+            sprite2.zOrder = 1;
+
+            sprite1.x = 128;
+            sprite1.y = 128;
+        };
+
+        const changeZOrder = () => {
+            sprite1.zOrder = sprite1.zOrder == 2 ? 1 : 2;
+            sprite2.zOrder = sprite2.zOrder == 2 ? 1 : 2;
+        };
+
+        initialize();
+        setInterval(changeZOrder, 1000);
+    </script>
+</body>
+
+</html>
