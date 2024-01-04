@@ -9,21 +9,5335 @@ var PIXI = (function (exports) {
     'use strict';
 
     "use strict";
-    var __defProp$W = Object.defineProperty;
+    const BrowserAdapter = {
+      createCanvas: (width, height) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        return canvas;
+      },
+      getCanvasRenderingContext2D: () => CanvasRenderingContext2D,
+      getWebGLRenderingContext: () => WebGLRenderingContext,
+      getNavigator: () => navigator,
+      getBaseUrl: () => {
+        var _a;
+        return (_a = document.baseURI) != null ? _a : window.location.href;
+      },
+      getFontFaceSet: () => document.fonts,
+      fetch: (url, options) => fetch(url, options),
+      parseXML: (xml) => {
+        const parser = new DOMParser();
+        return parser.parseFromString(xml, "text/xml");
+      }
+    };
+
+    "use strict";
+    let currentAdapter = BrowserAdapter;
+    const DOMAdapter = {
+      /**
+       * Returns the current adapter.
+       * @returns {environment.Adapter} The current adapter.
+       */
+      get() {
+        return currentAdapter;
+      },
+      /**
+       * Sets the current adapter.
+       * @param adapter - The new adapter.
+       */
+      set(adapter) {
+        currentAdapter = adapter;
+      }
+    };
+
+    var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+    function getDefaultExportFromCjs (x) {
+    	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+    }
+
+    function getDefaultExportFromNamespaceIfPresent (n) {
+    	return n && Object.prototype.hasOwnProperty.call(n, 'default') ? n['default'] : n;
+    }
+
+    function getDefaultExportFromNamespaceIfNotNamed (n) {
+    	return n && Object.prototype.hasOwnProperty.call(n, 'default') && Object.keys(n).length === 1 ? n['default'] : n;
+    }
+
+    function getAugmentedNamespace(n) {
+      if (n.__esModule) return n;
+      var f = n.default;
+    	if (typeof f == "function") {
+    		var a = function a () {
+    			if (this instanceof a) {
+            return Reflect.construct(f, arguments, this.constructor);
+    			}
+    			return f.apply(this, arguments);
+    		};
+    		a.prototype = f.prototype;
+      } else a = {};
+      Object.defineProperty(a, '__esModule', {value: true});
+    	Object.keys(n).forEach(function (k) {
+    		var d = Object.getOwnPropertyDescriptor(n, k);
+    		Object.defineProperty(a, k, d.get ? d : {
+    			enumerable: true,
+    			get: function () {
+    				return n[k];
+    			}
+    		});
+    	});
+    	return a;
+    }
+
+    var lib = {};
+
+    var dom$2 = {};
+
+    var conventions$2 = {};
+
+    'use strict';
+
+    /**
+     * Ponyfill for `Array.prototype.find` which is only available in ES6 runtimes.
+     *
+     * Works with anything that has a `length` property and index access properties, including NodeList.
+     *
+     * @template {unknown} T
+     * @param {Array<T> | ({length:number, [number]: T})} list
+     * @param {function (item: T, index: number, list:Array<T> | ({length:number, [number]: T})):boolean} predicate
+     * @param {Partial<Pick<ArrayConstructor['prototype'], 'find'>>?} ac `Array.prototype` by default,
+     * 				allows injecting a custom implementation in tests
+     * @returns {T | undefined}
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find
+     * @see https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.prototype.find
+     */
+    function find$1(list, predicate, ac) {
+    	if (ac === undefined) {
+    		ac = Array.prototype;
+    	}
+    	if (list && typeof ac.find === 'function') {
+    		return ac.find.call(list, predicate);
+    	}
+    	for (var i = 0; i < list.length; i++) {
+    		if (Object.prototype.hasOwnProperty.call(list, i)) {
+    			var item = list[i];
+    			if (predicate.call(undefined, item, i, list)) {
+    				return item;
+    			}
+    		}
+    	}
+    }
+
+    /**
+     * "Shallow freezes" an object to render it immutable.
+     * Uses `Object.freeze` if available,
+     * otherwise the immutability is only in the type.
+     *
+     * Is used to create "enum like" objects.
+     *
+     * @template T
+     * @param {T} object the object to freeze
+     * @param {Pick<ObjectConstructor, 'freeze'> = Object} oc `Object` by default,
+     * 				allows to inject custom object constructor for tests
+     * @returns {Readonly<T>}
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze
+     */
+    function freeze(object, oc) {
+    	if (oc === undefined) {
+    		oc = Object;
+    	}
+    	return oc && typeof oc.freeze === 'function' ? oc.freeze(object) : object
+    }
+
+    /**
+     * Since we can not rely on `Object.assign` we provide a simplified version
+     * that is sufficient for our needs.
+     *
+     * @param {Object} target
+     * @param {Object | null | undefined} source
+     *
+     * @returns {Object} target
+     * @throws TypeError if target is not an object
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
+     * @see https://tc39.es/ecma262/multipage/fundamental-objects.html#sec-object.assign
+     */
+    function assign(target, source) {
+    	if (target === null || typeof target !== 'object') {
+    		throw new TypeError('target is not an object')
+    	}
+    	for (var key in source) {
+    		if (Object.prototype.hasOwnProperty.call(source, key)) {
+    			target[key] = source[key];
+    		}
+    	}
+    	return target
+    }
+
+    /**
+     * All mime types that are allowed as input to `DOMParser.parseFromString`
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString#Argument02 MDN
+     * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#domparsersupportedtype WHATWG HTML Spec
+     * @see DOMParser.prototype.parseFromString
+     */
+    var MIME_TYPE = freeze({
+    	/**
+    	 * `text/html`, the only mime type that triggers treating an XML document as HTML.
+    	 *
+    	 * @see DOMParser.SupportedType.isHTML
+    	 * @see https://www.iana.org/assignments/media-types/text/html IANA MimeType registration
+    	 * @see https://en.wikipedia.org/wiki/HTML Wikipedia
+    	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString MDN
+    	 * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#dom-domparser-parsefromstring WHATWG HTML Spec
+    	 */
+    	HTML: 'text/html',
+
+    	/**
+    	 * Helper method to check a mime type if it indicates an HTML document
+    	 *
+    	 * @param {string} [value]
+    	 * @returns {boolean}
+    	 *
+    	 * @see https://www.iana.org/assignments/media-types/text/html IANA MimeType registration
+    	 * @see https://en.wikipedia.org/wiki/HTML Wikipedia
+    	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString MDN
+    	 * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#dom-domparser-parsefromstring 	 */
+    	isHTML: function (value) {
+    		return value === MIME_TYPE.HTML
+    	},
+
+    	/**
+    	 * `application/xml`, the standard mime type for XML documents.
+    	 *
+    	 * @see https://www.iana.org/assignments/media-types/application/xml IANA MimeType registration
+    	 * @see https://tools.ietf.org/html/rfc7303#section-9.1 RFC 7303
+    	 * @see https://en.wikipedia.org/wiki/XML_and_MIME Wikipedia
+    	 */
+    	XML_APPLICATION: 'application/xml',
+
+    	/**
+    	 * `text/html`, an alias for `application/xml`.
+    	 *
+    	 * @see https://tools.ietf.org/html/rfc7303#section-9.2 RFC 7303
+    	 * @see https://www.iana.org/assignments/media-types/text/xml IANA MimeType registration
+    	 * @see https://en.wikipedia.org/wiki/XML_and_MIME Wikipedia
+    	 */
+    	XML_TEXT: 'text/xml',
+
+    	/**
+    	 * `application/xhtml+xml`, indicates an XML document that has the default HTML namespace,
+    	 * but is parsed as an XML document.
+    	 *
+    	 * @see https://www.iana.org/assignments/media-types/application/xhtml+xml IANA MimeType registration
+    	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-createdocument WHATWG DOM Spec
+    	 * @see https://en.wikipedia.org/wiki/XHTML Wikipedia
+    	 */
+    	XML_XHTML_APPLICATION: 'application/xhtml+xml',
+
+    	/**
+    	 * `image/svg+xml`,
+    	 *
+    	 * @see https://www.iana.org/assignments/media-types/image/svg+xml IANA MimeType registration
+    	 * @see https://www.w3.org/TR/SVG11/ W3C SVG 1.1
+    	 * @see https://en.wikipedia.org/wiki/Scalable_Vector_Graphics Wikipedia
+    	 */
+    	XML_SVG_IMAGE: 'image/svg+xml',
+    });
+
+    /**
+     * Namespaces that are used in this code base.
+     *
+     * @see http://www.w3.org/TR/REC-xml-names
+     */
+    var NAMESPACE$3 = freeze({
+    	/**
+    	 * The XHTML namespace.
+    	 *
+    	 * @see http://www.w3.org/1999/xhtml
+    	 */
+    	HTML: 'http://www.w3.org/1999/xhtml',
+
+    	/**
+    	 * Checks if `uri` equals `NAMESPACE.HTML`.
+    	 *
+    	 * @param {string} [uri]
+    	 *
+    	 * @see NAMESPACE.HTML
+    	 */
+    	isHTML: function (uri) {
+    		return uri === NAMESPACE$3.HTML
+    	},
+
+    	/**
+    	 * The SVG namespace.
+    	 *
+    	 * @see http://www.w3.org/2000/svg
+    	 */
+    	SVG: 'http://www.w3.org/2000/svg',
+
+    	/**
+    	 * The `xml:` namespace.
+    	 *
+    	 * @see http://www.w3.org/XML/1998/namespace
+    	 */
+    	XML: 'http://www.w3.org/XML/1998/namespace',
+
+    	/**
+    	 * The `xmlns:` namespace
+    	 *
+    	 * @see https://www.w3.org/2000/xmlns/
+    	 */
+    	XMLNS: 'http://www.w3.org/2000/xmlns/',
+    });
+
+    var assign_1 = conventions$2.assign = assign;
+    var find_1 = conventions$2.find = find$1;
+    var freeze_1 = conventions$2.freeze = freeze;
+    var MIME_TYPE_1 = conventions$2.MIME_TYPE = MIME_TYPE;
+    var NAMESPACE_1 = conventions$2.NAMESPACE = NAMESPACE$3;
+
+    var conventions$1 = conventions$2;
+
+    var find = conventions$1.find;
+    var NAMESPACE$2 = conventions$1.NAMESPACE;
+
+    /**
+     * A prerequisite for `[].filter`, to drop elements that are empty
+     * @param {string} input
+     * @returns {boolean}
+     */
+    function notEmptyString (input) {
+    	return input !== ''
+    }
+    /**
+     * @see https://infra.spec.whatwg.org/#split-on-ascii-whitespace
+     * @see https://infra.spec.whatwg.org/#ascii-whitespace
+     *
+     * @param {string} input
+     * @returns {string[]} (can be empty)
+     */
+    function splitOnASCIIWhitespace(input) {
+    	// U+0009 TAB, U+000A LF, U+000C FF, U+000D CR, U+0020 SPACE
+    	return input ? input.split(/[\t\n\f\r ]+/).filter(notEmptyString) : []
+    }
+
+    /**
+     * Adds element as a key to current if it is not already present.
+     *
+     * @param {Record<string, boolean | undefined>} current
+     * @param {string} element
+     * @returns {Record<string, boolean | undefined>}
+     */
+    function orderedSetReducer (current, element) {
+    	if (!current.hasOwnProperty(element)) {
+    		current[element] = true;
+    	}
+    	return current;
+    }
+
+    /**
+     * @see https://infra.spec.whatwg.org/#ordered-set
+     * @param {string} input
+     * @returns {string[]}
+     */
+    function toOrderedSet(input) {
+    	if (!input) return [];
+    	var list = splitOnASCIIWhitespace(input);
+    	return Object.keys(list.reduce(orderedSetReducer, {}))
+    }
+
+    /**
+     * Uses `list.indexOf` to implement something like `Array.prototype.includes`,
+     * which we can not rely on being available.
+     *
+     * @param {any[]} list
+     * @returns {function(any): boolean}
+     */
+    function arrayIncludes (list) {
+    	return function(element) {
+    		return list && list.indexOf(element) !== -1;
+    	}
+    }
+
+    function copy(src,dest){
+    	for(var p in src){
+    		if (Object.prototype.hasOwnProperty.call(src, p)) {
+    			dest[p] = src[p];
+    		}
+    	}
+    }
+
+    /**
+    ^\w+\.prototype\.([_\w]+)\s*=\s*((?:.*\{\s*?[\r\n][\s\S]*?^})|\S.*?(?=[;\r\n]));?
+    ^\w+\.prototype\.([_\w]+)\s*=\s*(\S.*?(?=[;\r\n]));?
+     */
+    function _extends(Class,Super){
+    	var pt = Class.prototype;
+    	if(!(pt instanceof Super)){
+    		function t(){};
+    		t.prototype = Super.prototype;
+    		t = new t();
+    		copy(pt,t);
+    		Class.prototype = pt = t;
+    	}
+    	if(pt.constructor != Class){
+    		if(typeof Class != 'function'){
+    			console.error("unknown Class:"+Class);
+    		}
+    		pt.constructor = Class;
+    	}
+    }
+
+    // Node Types
+    var NodeType = {};
+    var ELEMENT_NODE                = NodeType.ELEMENT_NODE                = 1;
+    var ATTRIBUTE_NODE              = NodeType.ATTRIBUTE_NODE              = 2;
+    var TEXT_NODE                   = NodeType.TEXT_NODE                   = 3;
+    var CDATA_SECTION_NODE          = NodeType.CDATA_SECTION_NODE          = 4;
+    var ENTITY_REFERENCE_NODE       = NodeType.ENTITY_REFERENCE_NODE       = 5;
+    var ENTITY_NODE                 = NodeType.ENTITY_NODE                 = 6;
+    var PROCESSING_INSTRUCTION_NODE = NodeType.PROCESSING_INSTRUCTION_NODE = 7;
+    var COMMENT_NODE                = NodeType.COMMENT_NODE                = 8;
+    var DOCUMENT_NODE               = NodeType.DOCUMENT_NODE               = 9;
+    var DOCUMENT_TYPE_NODE          = NodeType.DOCUMENT_TYPE_NODE          = 10;
+    var DOCUMENT_FRAGMENT_NODE      = NodeType.DOCUMENT_FRAGMENT_NODE      = 11;
+    var NOTATION_NODE               = NodeType.NOTATION_NODE               = 12;
+
+    // ExceptionCode
+    var ExceptionCode = {};
+    var ExceptionMessage = {};
+    var INDEX_SIZE_ERR              = ExceptionCode.INDEX_SIZE_ERR              = ((ExceptionMessage[1]="Index size error"),1);
+    var DOMSTRING_SIZE_ERR          = ExceptionCode.DOMSTRING_SIZE_ERR          = ((ExceptionMessage[2]="DOMString size error"),2);
+    var HIERARCHY_REQUEST_ERR       = ExceptionCode.HIERARCHY_REQUEST_ERR       = ((ExceptionMessage[3]="Hierarchy request error"),3);
+    var WRONG_DOCUMENT_ERR          = ExceptionCode.WRONG_DOCUMENT_ERR          = ((ExceptionMessage[4]="Wrong document"),4);
+    var INVALID_CHARACTER_ERR       = ExceptionCode.INVALID_CHARACTER_ERR       = ((ExceptionMessage[5]="Invalid character"),5);
+    var NO_DATA_ALLOWED_ERR         = ExceptionCode.NO_DATA_ALLOWED_ERR         = ((ExceptionMessage[6]="No data allowed"),6);
+    var NO_MODIFICATION_ALLOWED_ERR = ExceptionCode.NO_MODIFICATION_ALLOWED_ERR = ((ExceptionMessage[7]="No modification allowed"),7);
+    var NOT_FOUND_ERR               = ExceptionCode.NOT_FOUND_ERR               = ((ExceptionMessage[8]="Not found"),8);
+    var NOT_SUPPORTED_ERR           = ExceptionCode.NOT_SUPPORTED_ERR           = ((ExceptionMessage[9]="Not supported"),9);
+    var INUSE_ATTRIBUTE_ERR         = ExceptionCode.INUSE_ATTRIBUTE_ERR         = ((ExceptionMessage[10]="Attribute in use"),10);
+    //level2
+    var INVALID_STATE_ERR        	= ExceptionCode.INVALID_STATE_ERR        	= ((ExceptionMessage[11]="Invalid state"),11);
+    var SYNTAX_ERR               	= ExceptionCode.SYNTAX_ERR               	= ((ExceptionMessage[12]="Syntax error"),12);
+    var INVALID_MODIFICATION_ERR 	= ExceptionCode.INVALID_MODIFICATION_ERR 	= ((ExceptionMessage[13]="Invalid modification"),13);
+    var NAMESPACE_ERR            	= ExceptionCode.NAMESPACE_ERR           	= ((ExceptionMessage[14]="Invalid namespace"),14);
+    var INVALID_ACCESS_ERR       	= ExceptionCode.INVALID_ACCESS_ERR      	= ((ExceptionMessage[15]="Invalid access"),15);
+
+    /**
+     * DOM Level 2
+     * Object DOMException
+     * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/ecma-script-binding.html
+     * @see http://www.w3.org/TR/REC-DOM-Level-1/ecma-script-language-binding.html
+     */
+    function DOMException(code, message) {
+    	if(message instanceof Error){
+    		var error = message;
+    	}else {
+    		error = this;
+    		Error.call(this, ExceptionMessage[code]);
+    		this.message = ExceptionMessage[code];
+    		if(Error.captureStackTrace) Error.captureStackTrace(this, DOMException);
+    	}
+    	error.code = code;
+    	if(message) this.message = this.message + ": " + message;
+    	return error;
+    };
+    DOMException.prototype = Error.prototype;
+    copy(ExceptionCode,DOMException);
+
+    /**
+     * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/core.html#ID-536297177
+     * The NodeList interface provides the abstraction of an ordered collection of nodes, without defining or constraining how this collection is implemented. NodeList objects in the DOM are live.
+     * The items in the NodeList are accessible via an integral index, starting from 0.
+     */
+    function NodeList() {
+    };
+    NodeList.prototype = {
+    	/**
+    	 * The number of nodes in the list. The range of valid child node indices is 0 to length-1 inclusive.
+    	 * @standard level1
+    	 */
+    	length:0,
+    	/**
+    	 * Returns the indexth item in the collection. If index is greater than or equal to the number of nodes in the list, this returns null.
+    	 * @standard level1
+    	 * @param index  unsigned long
+    	 *   Index into the collection.
+    	 * @return Node
+    	 * 	The node at the indexth position in the NodeList, or null if that is not a valid index.
+    	 */
+    	item: function(index) {
+    		return index >= 0 && index < this.length ? this[index] : null;
+    	},
+    	toString:function(isHTML,nodeFilter){
+    		for(var buf = [], i = 0;i<this.length;i++){
+    			serializeToString(this[i],buf,isHTML,nodeFilter);
+    		}
+    		return buf.join('');
+    	},
+    	/**
+    	 * @private
+    	 * @param {function (Node):boolean} predicate
+    	 * @returns {Node[]}
+    	 */
+    	filter: function (predicate) {
+    		return Array.prototype.filter.call(this, predicate);
+    	},
+    	/**
+    	 * @private
+    	 * @param {Node} item
+    	 * @returns {number}
+    	 */
+    	indexOf: function (item) {
+    		return Array.prototype.indexOf.call(this, item);
+    	},
+    };
+
+    function LiveNodeList(node,refresh){
+    	this._node = node;
+    	this._refresh = refresh;
+    	_updateLiveList(this);
+    }
+    function _updateLiveList(list){
+    	var inc = list._node._inc || list._node.ownerDocument._inc;
+    	if (list._inc !== inc) {
+    		var ls = list._refresh(list._node);
+    		__set__(list,'length',ls.length);
+    		if (!list.$$length || ls.length < list.$$length) {
+    			for (var i = ls.length; i in list; i++) {
+    				if (Object.prototype.hasOwnProperty.call(list, i)) {
+    					delete list[i];
+    				}
+    			}
+    		}
+    		copy(ls,list);
+    		list._inc = inc;
+    	}
+    }
+    LiveNodeList.prototype.item = function(i){
+    	_updateLiveList(this);
+    	return this[i] || null;
+    };
+
+    _extends(LiveNodeList,NodeList);
+
+    /**
+     * Objects implementing the NamedNodeMap interface are used
+     * to represent collections of nodes that can be accessed by name.
+     * Note that NamedNodeMap does not inherit from NodeList;
+     * NamedNodeMaps are not maintained in any particular order.
+     * Objects contained in an object implementing NamedNodeMap may also be accessed by an ordinal index,
+     * but this is simply to allow convenient enumeration of the contents of a NamedNodeMap,
+     * and does not imply that the DOM specifies an order to these Nodes.
+     * NamedNodeMap objects in the DOM are live.
+     * used for attributes or DocumentType entities
+     */
+    function NamedNodeMap() {
+    };
+
+    function _findNodeIndex(list,node){
+    	var i = list.length;
+    	while(i--){
+    		if(list[i] === node){return i}
+    	}
+    }
+
+    function _addNamedNode(el,list,newAttr,oldAttr){
+    	if(oldAttr){
+    		list[_findNodeIndex(list,oldAttr)] = newAttr;
+    	}else {
+    		list[list.length++] = newAttr;
+    	}
+    	if(el){
+    		newAttr.ownerElement = el;
+    		var doc = el.ownerDocument;
+    		if(doc){
+    			oldAttr && _onRemoveAttribute(doc,el,oldAttr);
+    			_onAddAttribute(doc,el,newAttr);
+    		}
+    	}
+    }
+    function _removeNamedNode(el,list,attr){
+    	//console.log('remove attr:'+attr)
+    	var i = _findNodeIndex(list,attr);
+    	if(i>=0){
+    		var lastIndex = list.length-1;
+    		while(i<lastIndex){
+    			list[i] = list[++i];
+    		}
+    		list.length = lastIndex;
+    		if(el){
+    			var doc = el.ownerDocument;
+    			if(doc){
+    				_onRemoveAttribute(doc,el,attr);
+    				attr.ownerElement = null;
+    			}
+    		}
+    	}else {
+    		throw new DOMException(NOT_FOUND_ERR,new Error(el.tagName+'@'+attr))
+    	}
+    }
+    NamedNodeMap.prototype = {
+    	length:0,
+    	item:NodeList.prototype.item,
+    	getNamedItem: function(key) {
+    //		if(key.indexOf(':')>0 || key == 'xmlns'){
+    //			return null;
+    //		}
+    		//console.log()
+    		var i = this.length;
+    		while(i--){
+    			var attr = this[i];
+    			//console.log(attr.nodeName,key)
+    			if(attr.nodeName == key){
+    				return attr;
+    			}
+    		}
+    	},
+    	setNamedItem: function(attr) {
+    		var el = attr.ownerElement;
+    		if(el && el!=this._ownerElement){
+    			throw new DOMException(INUSE_ATTRIBUTE_ERR);
+    		}
+    		var oldAttr = this.getNamedItem(attr.nodeName);
+    		_addNamedNode(this._ownerElement,this,attr,oldAttr);
+    		return oldAttr;
+    	},
+    	/* returns Node */
+    	setNamedItemNS: function(attr) {// raises: WRONG_DOCUMENT_ERR,NO_MODIFICATION_ALLOWED_ERR,INUSE_ATTRIBUTE_ERR
+    		var el = attr.ownerElement, oldAttr;
+    		if(el && el!=this._ownerElement){
+    			throw new DOMException(INUSE_ATTRIBUTE_ERR);
+    		}
+    		oldAttr = this.getNamedItemNS(attr.namespaceURI,attr.localName);
+    		_addNamedNode(this._ownerElement,this,attr,oldAttr);
+    		return oldAttr;
+    	},
+
+    	/* returns Node */
+    	removeNamedItem: function(key) {
+    		var attr = this.getNamedItem(key);
+    		_removeNamedNode(this._ownerElement,this,attr);
+    		return attr;
+
+
+    	},// raises: NOT_FOUND_ERR,NO_MODIFICATION_ALLOWED_ERR
+
+    	//for level2
+    	removeNamedItemNS:function(namespaceURI,localName){
+    		var attr = this.getNamedItemNS(namespaceURI,localName);
+    		_removeNamedNode(this._ownerElement,this,attr);
+    		return attr;
+    	},
+    	getNamedItemNS: function(namespaceURI, localName) {
+    		var i = this.length;
+    		while(i--){
+    			var node = this[i];
+    			if(node.localName == localName && node.namespaceURI == namespaceURI){
+    				return node;
+    			}
+    		}
+    		return null;
+    	}
+    };
+
+    /**
+     * The DOMImplementation interface represents an object providing methods
+     * which are not dependent on any particular document.
+     * Such an object is returned by the `Document.implementation` property.
+     *
+     * __The individual methods describe the differences compared to the specs.__
+     *
+     * @constructor
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation MDN
+     * @see https://www.w3.org/TR/REC-DOM-Level-1/level-one-core.html#ID-102161490 DOM Level 1 Core (Initial)
+     * @see https://www.w3.org/TR/DOM-Level-2-Core/core.html#ID-102161490 DOM Level 2 Core
+     * @see https://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-102161490 DOM Level 3 Core
+     * @see https://dom.spec.whatwg.org/#domimplementation DOM Living Standard
+     */
+    function DOMImplementation$2() {
+    }
+
+    DOMImplementation$2.prototype = {
+    	/**
+    	 * The DOMImplementation.hasFeature() method returns a Boolean flag indicating if a given feature is supported.
+    	 * The different implementations fairly diverged in what kind of features were reported.
+    	 * The latest version of the spec settled to force this method to always return true, where the functionality was accurate and in use.
+    	 *
+    	 * @deprecated It is deprecated and modern browsers return true in all cases.
+    	 *
+    	 * @param {string} feature
+    	 * @param {string} [version]
+    	 * @returns {boolean} always true
+    	 *
+    	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation/hasFeature MDN
+    	 * @see https://www.w3.org/TR/REC-DOM-Level-1/level-one-core.html#ID-5CED94D7 DOM Level 1 Core
+    	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-hasfeature DOM Living Standard
+    	 */
+    	hasFeature: function(feature, version) {
+    			return true;
+    	},
+    	/**
+    	 * Creates an XML Document object of the specified type with its document element.
+    	 *
+    	 * __It behaves slightly different from the description in the living standard__:
+    	 * - There is no interface/class `XMLDocument`, it returns a `Document` instance.
+    	 * - `contentType`, `encoding`, `mode`, `origin`, `url` fields are currently not declared.
+    	 * - this implementation is not validating names or qualified names
+    	 *   (when parsing XML strings, the SAX parser takes care of that)
+    	 *
+    	 * @param {string|null} namespaceURI
+    	 * @param {string} qualifiedName
+    	 * @param {DocumentType=null} doctype
+    	 * @returns {Document}
+    	 *
+    	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation/createDocument MDN
+    	 * @see https://www.w3.org/TR/DOM-Level-2-Core/core.html#Level-2-Core-DOM-createDocument DOM Level 2 Core (initial)
+    	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-createdocument  DOM Level 2 Core
+    	 *
+    	 * @see https://dom.spec.whatwg.org/#validate-and-extract DOM: Validate and extract
+    	 * @see https://www.w3.org/TR/xml/#NT-NameStartChar XML Spec: Names
+    	 * @see https://www.w3.org/TR/xml-names/#ns-qualnames XML Namespaces: Qualified names
+    	 */
+    	createDocument: function(namespaceURI,  qualifiedName, doctype){
+    		var doc = new Document();
+    		doc.implementation = this;
+    		doc.childNodes = new NodeList();
+    		doc.doctype = doctype || null;
+    		if (doctype){
+    			doc.appendChild(doctype);
+    		}
+    		if (qualifiedName){
+    			var root = doc.createElementNS(namespaceURI, qualifiedName);
+    			doc.appendChild(root);
+    		}
+    		return doc;
+    	},
+    	/**
+    	 * Returns a doctype, with the given `qualifiedName`, `publicId`, and `systemId`.
+    	 *
+    	 * __This behavior is slightly different from the in the specs__:
+    	 * - this implementation is not validating names or qualified names
+    	 *   (when parsing XML strings, the SAX parser takes care of that)
+    	 *
+    	 * @param {string} qualifiedName
+    	 * @param {string} [publicId]
+    	 * @param {string} [systemId]
+    	 * @returns {DocumentType} which can either be used with `DOMImplementation.createDocument` upon document creation
+    	 * 				  or can be put into the document via methods like `Node.insertBefore()` or `Node.replaceChild()`
+    	 *
+    	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation/createDocumentType MDN
+    	 * @see https://www.w3.org/TR/DOM-Level-2-Core/core.html#Level-2-Core-DOM-createDocType DOM Level 2 Core
+    	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-createdocumenttype DOM Living Standard
+    	 *
+    	 * @see https://dom.spec.whatwg.org/#validate-and-extract DOM: Validate and extract
+    	 * @see https://www.w3.org/TR/xml/#NT-NameStartChar XML Spec: Names
+    	 * @see https://www.w3.org/TR/xml-names/#ns-qualnames XML Namespaces: Qualified names
+    	 */
+    	createDocumentType: function(qualifiedName, publicId, systemId){
+    		var node = new DocumentType();
+    		node.name = qualifiedName;
+    		node.nodeName = qualifiedName;
+    		node.publicId = publicId || '';
+    		node.systemId = systemId || '';
+
+    		return node;
+    	}
+    };
+
+
+    /**
+     * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/core.html#ID-1950641247
+     */
+
+    function Node$1() {
+    };
+
+    Node$1.prototype = {
+    	firstChild : null,
+    	lastChild : null,
+    	previousSibling : null,
+    	nextSibling : null,
+    	attributes : null,
+    	parentNode : null,
+    	childNodes : null,
+    	ownerDocument : null,
+    	nodeValue : null,
+    	namespaceURI : null,
+    	prefix : null,
+    	localName : null,
+    	// Modified in DOM Level 2:
+    	insertBefore:function(newChild, refChild){//raises
+    		return _insertBefore(this,newChild,refChild);
+    	},
+    	replaceChild:function(newChild, oldChild){//raises
+    		_insertBefore(this, newChild,oldChild, assertPreReplacementValidityInDocument);
+    		if(oldChild){
+    			this.removeChild(oldChild);
+    		}
+    	},
+    	removeChild:function(oldChild){
+    		return _removeChild(this,oldChild);
+    	},
+    	appendChild:function(newChild){
+    		return this.insertBefore(newChild,null);
+    	},
+    	hasChildNodes:function(){
+    		return this.firstChild != null;
+    	},
+    	cloneNode:function(deep){
+    		return cloneNode(this.ownerDocument||this,this,deep);
+    	},
+    	// Modified in DOM Level 2:
+    	normalize:function(){
+    		var child = this.firstChild;
+    		while(child){
+    			var next = child.nextSibling;
+    			if(next && next.nodeType == TEXT_NODE && child.nodeType == TEXT_NODE){
+    				this.removeChild(next);
+    				child.appendData(next.data);
+    			}else {
+    				child.normalize();
+    				child = next;
+    			}
+    		}
+    	},
+      	// Introduced in DOM Level 2:
+    	isSupported:function(feature, version){
+    		return this.ownerDocument.implementation.hasFeature(feature,version);
+    	},
+        // Introduced in DOM Level 2:
+        hasAttributes:function(){
+        	return this.attributes.length>0;
+        },
+    	/**
+    	 * Look up the prefix associated to the given namespace URI, starting from this node.
+    	 * **The default namespace declarations are ignored by this method.**
+    	 * See Namespace Prefix Lookup for details on the algorithm used by this method.
+    	 *
+    	 * _Note: The implementation seems to be incomplete when compared to the algorithm described in the specs._
+    	 *
+    	 * @param {string | null} namespaceURI
+    	 * @returns {string | null}
+    	 * @see https://www.w3.org/TR/DOM-Level-3-Core/core.html#Node3-lookupNamespacePrefix
+    	 * @see https://www.w3.org/TR/DOM-Level-3-Core/namespaces-algorithms.html#lookupNamespacePrefixAlgo
+    	 * @see https://dom.spec.whatwg.org/#dom-node-lookupprefix
+    	 * @see https://github.com/xmldom/xmldom/issues/322
+    	 */
+        lookupPrefix:function(namespaceURI){
+        	var el = this;
+        	while(el){
+        		var map = el._nsMap;
+        		//console.dir(map)
+        		if(map){
+        			for(var n in map){
+    						if (Object.prototype.hasOwnProperty.call(map, n) && map[n] === namespaceURI) {
+    							return n;
+    						}
+        			}
+        		}
+        		el = el.nodeType == ATTRIBUTE_NODE?el.ownerDocument : el.parentNode;
+        	}
+        	return null;
+        },
+        // Introduced in DOM Level 3:
+        lookupNamespaceURI:function(prefix){
+        	var el = this;
+        	while(el){
+        		var map = el._nsMap;
+        		//console.dir(map)
+        		if(map){
+        			if(Object.prototype.hasOwnProperty.call(map, prefix)){
+        				return map[prefix] ;
+        			}
+        		}
+        		el = el.nodeType == ATTRIBUTE_NODE?el.ownerDocument : el.parentNode;
+        	}
+        	return null;
+        },
+        // Introduced in DOM Level 3:
+        isDefaultNamespace:function(namespaceURI){
+        	var prefix = this.lookupPrefix(namespaceURI);
+        	return prefix == null;
+        }
+    };
+
+
+    function _xmlEncoder(c){
+    	return c == '<' && '&lt;' ||
+             c == '>' && '&gt;' ||
+             c == '&' && '&amp;' ||
+             c == '"' && '&quot;' ||
+             '&#'+c.charCodeAt()+';'
+    }
+
+
+    copy(NodeType,Node$1);
+    copy(NodeType,Node$1.prototype);
+
+    /**
+     * @param callback return true for continue,false for break
+     * @return boolean true: break visit;
+     */
+    function _visitNode(node,callback){
+    	if(callback(node)){
+    		return true;
+    	}
+    	if(node = node.firstChild){
+    		do{
+    			if(_visitNode(node,callback)){return true}
+            }while(node=node.nextSibling)
+        }
+    }
+
+
+
+    function Document(){
+    	this.ownerDocument = this;
+    }
+
+    function _onAddAttribute(doc,el,newAttr){
+    	doc && doc._inc++;
+    	var ns = newAttr.namespaceURI ;
+    	if(ns === NAMESPACE$2.XMLNS){
+    		//update namespace
+    		el._nsMap[newAttr.prefix?newAttr.localName:''] = newAttr.value;
+    	}
+    }
+
+    function _onRemoveAttribute(doc,el,newAttr,remove){
+    	doc && doc._inc++;
+    	var ns = newAttr.namespaceURI ;
+    	if(ns === NAMESPACE$2.XMLNS){
+    		//update namespace
+    		delete el._nsMap[newAttr.prefix?newAttr.localName:''];
+    	}
+    }
+
+    /**
+     * Updates `el.childNodes`, updating the indexed items and it's `length`.
+     * Passing `newChild` means it will be appended.
+     * Otherwise it's assumed that an item has been removed,
+     * and `el.firstNode` and it's `.nextSibling` are used
+     * to walk the current list of child nodes.
+     *
+     * @param {Document} doc
+     * @param {Node} el
+     * @param {Node} [newChild]
+     * @private
+     */
+    function _onUpdateChild (doc, el, newChild) {
+    	if(doc && doc._inc){
+    		doc._inc++;
+    		//update childNodes
+    		var cs = el.childNodes;
+    		if (newChild) {
+    			cs[cs.length++] = newChild;
+    		} else {
+    			var child = el.firstChild;
+    			var i = 0;
+    			while (child) {
+    				cs[i++] = child;
+    				child = child.nextSibling;
+    			}
+    			cs.length = i;
+    			delete cs[cs.length];
+    		}
+    	}
+    }
+
+    /**
+     * Removes the connections between `parentNode` and `child`
+     * and any existing `child.previousSibling` or `child.nextSibling`.
+     *
+     * @see https://github.com/xmldom/xmldom/issues/135
+     * @see https://github.com/xmldom/xmldom/issues/145
+     *
+     * @param {Node} parentNode
+     * @param {Node} child
+     * @returns {Node} the child that was removed.
+     * @private
+     */
+    function _removeChild (parentNode, child) {
+    	var previous = child.previousSibling;
+    	var next = child.nextSibling;
+    	if (previous) {
+    		previous.nextSibling = next;
+    	} else {
+    		parentNode.firstChild = next;
+    	}
+    	if (next) {
+    		next.previousSibling = previous;
+    	} else {
+    		parentNode.lastChild = previous;
+    	}
+    	child.parentNode = null;
+    	child.previousSibling = null;
+    	child.nextSibling = null;
+    	_onUpdateChild(parentNode.ownerDocument, parentNode);
+    	return child;
+    }
+
+    /**
+     * Returns `true` if `node` can be a parent for insertion.
+     * @param {Node} node
+     * @returns {boolean}
+     */
+    function hasValidParentNodeType(node) {
+    	return (
+    		node &&
+    		(node.nodeType === Node$1.DOCUMENT_NODE || node.nodeType === Node$1.DOCUMENT_FRAGMENT_NODE || node.nodeType === Node$1.ELEMENT_NODE)
+    	);
+    }
+
+    /**
+     * Returns `true` if `node` can be inserted according to it's `nodeType`.
+     * @param {Node} node
+     * @returns {boolean}
+     */
+    function hasInsertableNodeType(node) {
+    	return (
+    		node &&
+    		(isElementNode(node) ||
+    			isTextNode(node) ||
+    			isDocTypeNode(node) ||
+    			node.nodeType === Node$1.DOCUMENT_FRAGMENT_NODE ||
+    			node.nodeType === Node$1.COMMENT_NODE ||
+    			node.nodeType === Node$1.PROCESSING_INSTRUCTION_NODE)
+    	);
+    }
+
+    /**
+     * Returns true if `node` is a DOCTYPE node
+     * @param {Node} node
+     * @returns {boolean}
+     */
+    function isDocTypeNode(node) {
+    	return node && node.nodeType === Node$1.DOCUMENT_TYPE_NODE;
+    }
+
+    /**
+     * Returns true if the node is an element
+     * @param {Node} node
+     * @returns {boolean}
+     */
+    function isElementNode(node) {
+    	return node && node.nodeType === Node$1.ELEMENT_NODE;
+    }
+    /**
+     * Returns true if `node` is a text node
+     * @param {Node} node
+     * @returns {boolean}
+     */
+    function isTextNode(node) {
+    	return node && node.nodeType === Node$1.TEXT_NODE;
+    }
+
+    /**
+     * Check if en element node can be inserted before `child`, or at the end if child is falsy,
+     * according to the presence and position of a doctype node on the same level.
+     *
+     * @param {Document} doc The document node
+     * @param {Node} child the node that would become the nextSibling if the element would be inserted
+     * @returns {boolean} `true` if an element can be inserted before child
+     * @private
+     * https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity
+     */
+    function isElementInsertionPossible(doc, child) {
+    	var parentChildNodes = doc.childNodes || [];
+    	if (find(parentChildNodes, isElementNode) || isDocTypeNode(child)) {
+    		return false;
+    	}
+    	var docTypeNode = find(parentChildNodes, isDocTypeNode);
+    	return !(child && docTypeNode && parentChildNodes.indexOf(docTypeNode) > parentChildNodes.indexOf(child));
+    }
+
+    /**
+     * Check if en element node can be inserted before `child`, or at the end if child is falsy,
+     * according to the presence and position of a doctype node on the same level.
+     *
+     * @param {Node} doc The document node
+     * @param {Node} child the node that would become the nextSibling if the element would be inserted
+     * @returns {boolean} `true` if an element can be inserted before child
+     * @private
+     * https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity
+     */
+    function isElementReplacementPossible(doc, child) {
+    	var parentChildNodes = doc.childNodes || [];
+
+    	function hasElementChildThatIsNotChild(node) {
+    		return isElementNode(node) && node !== child;
+    	}
+
+    	if (find(parentChildNodes, hasElementChildThatIsNotChild)) {
+    		return false;
+    	}
+    	var docTypeNode = find(parentChildNodes, isDocTypeNode);
+    	return !(child && docTypeNode && parentChildNodes.indexOf(docTypeNode) > parentChildNodes.indexOf(child));
+    }
+
+    /**
+     * @private
+     * Steps 1-5 of the checks before inserting and before replacing a child are the same.
+     *
+     * @param {Node} parent the parent node to insert `node` into
+     * @param {Node} node the node to insert
+     * @param {Node=} child the node that should become the `nextSibling` of `node`
+     * @returns {Node}
+     * @throws DOMException for several node combinations that would create a DOM that is not well-formed.
+     * @throws DOMException if `child` is provided but is not a child of `parent`.
+     * @see https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity
+     * @see https://dom.spec.whatwg.org/#concept-node-replace
+     */
+    function assertPreInsertionValidity1to5(parent, node, child) {
+    	// 1. If `parent` is not a Document, DocumentFragment, or Element node, then throw a "HierarchyRequestError" DOMException.
+    	if (!hasValidParentNodeType(parent)) {
+    		throw new DOMException(HIERARCHY_REQUEST_ERR, 'Unexpected parent node type ' + parent.nodeType);
+    	}
+    	// 2. If `node` is a host-including inclusive ancestor of `parent`, then throw a "HierarchyRequestError" DOMException.
+    	// not implemented!
+    	// 3. If `child` is non-null and its parent is not `parent`, then throw a "NotFoundError" DOMException.
+    	if (child && child.parentNode !== parent) {
+    		throw new DOMException(NOT_FOUND_ERR, 'child not in parent');
+    	}
+    	if (
+    		// 4. If `node` is not a DocumentFragment, DocumentType, Element, or CharacterData node, then throw a "HierarchyRequestError" DOMException.
+    		!hasInsertableNodeType(node) ||
+    		// 5. If either `node` is a Text node and `parent` is a document,
+    		// the sax parser currently adds top level text nodes, this will be fixed in 0.9.0
+    		// || (node.nodeType === Node.TEXT_NODE && parent.nodeType === Node.DOCUMENT_NODE)
+    		// or `node` is a doctype and `parent` is not a document, then throw a "HierarchyRequestError" DOMException.
+    		(isDocTypeNode(node) && parent.nodeType !== Node$1.DOCUMENT_NODE)
+    	) {
+    		throw new DOMException(
+    			HIERARCHY_REQUEST_ERR,
+    			'Unexpected node type ' + node.nodeType + ' for parent node type ' + parent.nodeType
+    		);
+    	}
+    }
+
+    /**
+     * @private
+     * Step 6 of the checks before inserting and before replacing a child are different.
+     *
+     * @param {Document} parent the parent node to insert `node` into
+     * @param {Node} node the node to insert
+     * @param {Node | undefined} child the node that should become the `nextSibling` of `node`
+     * @returns {Node}
+     * @throws DOMException for several node combinations that would create a DOM that is not well-formed.
+     * @throws DOMException if `child` is provided but is not a child of `parent`.
+     * @see https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity
+     * @see https://dom.spec.whatwg.org/#concept-node-replace
+     */
+    function assertPreInsertionValidityInDocument(parent, node, child) {
+    	var parentChildNodes = parent.childNodes || [];
+    	var nodeChildNodes = node.childNodes || [];
+
+    	// DocumentFragment
+    	if (node.nodeType === Node$1.DOCUMENT_FRAGMENT_NODE) {
+    		var nodeChildElements = nodeChildNodes.filter(isElementNode);
+    		// If node has more than one element child or has a Text node child.
+    		if (nodeChildElements.length > 1 || find(nodeChildNodes, isTextNode)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'More than one element or text in fragment');
+    		}
+    		// Otherwise, if `node` has one element child and either `parent` has an element child,
+    		// `child` is a doctype, or `child` is non-null and a doctype is following `child`.
+    		if (nodeChildElements.length === 1 && !isElementInsertionPossible(parent, child)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Element in fragment can not be inserted before doctype');
+    		}
+    	}
+    	// Element
+    	if (isElementNode(node)) {
+    		// `parent` has an element child, `child` is a doctype,
+    		// or `child` is non-null and a doctype is following `child`.
+    		if (!isElementInsertionPossible(parent, child)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Only one element can be added and only after doctype');
+    		}
+    	}
+    	// DocumentType
+    	if (isDocTypeNode(node)) {
+    		// `parent` has a doctype child,
+    		if (find(parentChildNodes, isDocTypeNode)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Only one doctype is allowed');
+    		}
+    		var parentElementChild = find(parentChildNodes, isElementNode);
+    		// `child` is non-null and an element is preceding `child`,
+    		if (child && parentChildNodes.indexOf(parentElementChild) < parentChildNodes.indexOf(child)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Doctype can only be inserted before an element');
+    		}
+    		// or `child` is null and `parent` has an element child.
+    		if (!child && parentElementChild) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Doctype can not be appended since element is present');
+    		}
+    	}
+    }
+
+    /**
+     * @private
+     * Step 6 of the checks before inserting and before replacing a child are different.
+     *
+     * @param {Document} parent the parent node to insert `node` into
+     * @param {Node} node the node to insert
+     * @param {Node | undefined} child the node that should become the `nextSibling` of `node`
+     * @returns {Node}
+     * @throws DOMException for several node combinations that would create a DOM that is not well-formed.
+     * @throws DOMException if `child` is provided but is not a child of `parent`.
+     * @see https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity
+     * @see https://dom.spec.whatwg.org/#concept-node-replace
+     */
+    function assertPreReplacementValidityInDocument(parent, node, child) {
+    	var parentChildNodes = parent.childNodes || [];
+    	var nodeChildNodes = node.childNodes || [];
+
+    	// DocumentFragment
+    	if (node.nodeType === Node$1.DOCUMENT_FRAGMENT_NODE) {
+    		var nodeChildElements = nodeChildNodes.filter(isElementNode);
+    		// If `node` has more than one element child or has a Text node child.
+    		if (nodeChildElements.length > 1 || find(nodeChildNodes, isTextNode)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'More than one element or text in fragment');
+    		}
+    		// Otherwise, if `node` has one element child and either `parent` has an element child that is not `child` or a doctype is following `child`.
+    		if (nodeChildElements.length === 1 && !isElementReplacementPossible(parent, child)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Element in fragment can not be inserted before doctype');
+    		}
+    	}
+    	// Element
+    	if (isElementNode(node)) {
+    		// `parent` has an element child that is not `child` or a doctype is following `child`.
+    		if (!isElementReplacementPossible(parent, child)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Only one element can be added and only after doctype');
+    		}
+    	}
+    	// DocumentType
+    	if (isDocTypeNode(node)) {
+    		function hasDoctypeChildThatIsNotChild(node) {
+    			return isDocTypeNode(node) && node !== child;
+    		}
+
+    		// `parent` has a doctype child that is not `child`,
+    		if (find(parentChildNodes, hasDoctypeChildThatIsNotChild)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Only one doctype is allowed');
+    		}
+    		var parentElementChild = find(parentChildNodes, isElementNode);
+    		// or an element is preceding `child`.
+    		if (child && parentChildNodes.indexOf(parentElementChild) < parentChildNodes.indexOf(child)) {
+    			throw new DOMException(HIERARCHY_REQUEST_ERR, 'Doctype can only be inserted before an element');
+    		}
+    	}
+    }
+
+    /**
+     * @private
+     * @param {Node} parent the parent node to insert `node` into
+     * @param {Node} node the node to insert
+     * @param {Node=} child the node that should become the `nextSibling` of `node`
+     * @returns {Node}
+     * @throws DOMException for several node combinations that would create a DOM that is not well-formed.
+     * @throws DOMException if `child` is provided but is not a child of `parent`.
+     * @see https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity
+     */
+    function _insertBefore(parent, node, child, _inDocumentAssertion) {
+    	// To ensure pre-insertion validity of a node into a parent before a child, run these steps:
+    	assertPreInsertionValidity1to5(parent, node, child);
+
+    	// If parent is a document, and any of the statements below, switched on the interface node implements,
+    	// are true, then throw a "HierarchyRequestError" DOMException.
+    	if (parent.nodeType === Node$1.DOCUMENT_NODE) {
+    		(_inDocumentAssertion || assertPreInsertionValidityInDocument)(parent, node, child);
+    	}
+
+    	var cp = node.parentNode;
+    	if(cp){
+    		cp.removeChild(node);//remove and update
+    	}
+    	if(node.nodeType === DOCUMENT_FRAGMENT_NODE){
+    		var newFirst = node.firstChild;
+    		if (newFirst == null) {
+    			return node;
+    		}
+    		var newLast = node.lastChild;
+    	}else {
+    		newFirst = newLast = node;
+    	}
+    	var pre = child ? child.previousSibling : parent.lastChild;
+
+    	newFirst.previousSibling = pre;
+    	newLast.nextSibling = child;
+
+
+    	if(pre){
+    		pre.nextSibling = newFirst;
+    	}else {
+    		parent.firstChild = newFirst;
+    	}
+    	if(child == null){
+    		parent.lastChild = newLast;
+    	}else {
+    		child.previousSibling = newLast;
+    	}
+    	do{
+    		newFirst.parentNode = parent;
+    	}while(newFirst !== newLast && (newFirst= newFirst.nextSibling))
+    	_onUpdateChild(parent.ownerDocument||parent, parent);
+    	//console.log(parent.lastChild.nextSibling == null)
+    	if (node.nodeType == DOCUMENT_FRAGMENT_NODE) {
+    		node.firstChild = node.lastChild = null;
+    	}
+    	return node;
+    }
+
+    /**
+     * Appends `newChild` to `parentNode`.
+     * If `newChild` is already connected to a `parentNode` it is first removed from it.
+     *
+     * @see https://github.com/xmldom/xmldom/issues/135
+     * @see https://github.com/xmldom/xmldom/issues/145
+     * @param {Node} parentNode
+     * @param {Node} newChild
+     * @returns {Node}
+     * @private
+     */
+    function _appendSingleChild (parentNode, newChild) {
+    	if (newChild.parentNode) {
+    		newChild.parentNode.removeChild(newChild);
+    	}
+    	newChild.parentNode = parentNode;
+    	newChild.previousSibling = parentNode.lastChild;
+    	newChild.nextSibling = null;
+    	if (newChild.previousSibling) {
+    		newChild.previousSibling.nextSibling = newChild;
+    	} else {
+    		parentNode.firstChild = newChild;
+    	}
+    	parentNode.lastChild = newChild;
+    	_onUpdateChild(parentNode.ownerDocument, parentNode, newChild);
+    	return newChild;
+    }
+
+    Document.prototype = {
+    	//implementation : null,
+    	nodeName :  '#document',
+    	nodeType :  DOCUMENT_NODE,
+    	/**
+    	 * The DocumentType node of the document.
+    	 *
+    	 * @readonly
+    	 * @type DocumentType
+    	 */
+    	doctype :  null,
+    	documentElement :  null,
+    	_inc : 1,
+
+    	insertBefore :  function(newChild, refChild){//raises
+    		if(newChild.nodeType == DOCUMENT_FRAGMENT_NODE){
+    			var child = newChild.firstChild;
+    			while(child){
+    				var next = child.nextSibling;
+    				this.insertBefore(child,refChild);
+    				child = next;
+    			}
+    			return newChild;
+    		}
+    		_insertBefore(this, newChild, refChild);
+    		newChild.ownerDocument = this;
+    		if (this.documentElement === null && newChild.nodeType === ELEMENT_NODE) {
+    			this.documentElement = newChild;
+    		}
+
+    		return newChild;
+    	},
+    	removeChild :  function(oldChild){
+    		if(this.documentElement == oldChild){
+    			this.documentElement = null;
+    		}
+    		return _removeChild(this,oldChild);
+    	},
+    	replaceChild: function (newChild, oldChild) {
+    		//raises
+    		_insertBefore(this, newChild, oldChild, assertPreReplacementValidityInDocument);
+    		newChild.ownerDocument = this;
+    		if (oldChild) {
+    			this.removeChild(oldChild);
+    		}
+    		if (isElementNode(newChild)) {
+    			this.documentElement = newChild;
+    		}
+    	},
+    	// Introduced in DOM Level 2:
+    	importNode : function(importedNode,deep){
+    		return importNode(this,importedNode,deep);
+    	},
+    	// Introduced in DOM Level 2:
+    	getElementById :	function(id){
+    		var rtv = null;
+    		_visitNode(this.documentElement,function(node){
+    			if(node.nodeType == ELEMENT_NODE){
+    				if(node.getAttribute('id') == id){
+    					rtv = node;
+    					return true;
+    				}
+    			}
+    		});
+    		return rtv;
+    	},
+
+    	/**
+    	 * The `getElementsByClassName` method of `Document` interface returns an array-like object
+    	 * of all child elements which have **all** of the given class name(s).
+    	 *
+    	 * Returns an empty list if `classeNames` is an empty string or only contains HTML white space characters.
+    	 *
+    	 *
+    	 * Warning: This is a live LiveNodeList.
+    	 * Changes in the DOM will reflect in the array as the changes occur.
+    	 * If an element selected by this array no longer qualifies for the selector,
+    	 * it will automatically be removed. Be aware of this for iteration purposes.
+    	 *
+    	 * @param {string} classNames is a string representing the class name(s) to match; multiple class names are separated by (ASCII-)whitespace
+    	 *
+    	 * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByClassName
+    	 * @see https://dom.spec.whatwg.org/#concept-getelementsbyclassname
+    	 */
+    	getElementsByClassName: function(classNames) {
+    		var classNamesSet = toOrderedSet(classNames);
+    		return new LiveNodeList(this, function(base) {
+    			var ls = [];
+    			if (classNamesSet.length > 0) {
+    				_visitNode(base.documentElement, function(node) {
+    					if(node !== base && node.nodeType === ELEMENT_NODE) {
+    						var nodeClassNames = node.getAttribute('class');
+    						// can be null if the attribute does not exist
+    						if (nodeClassNames) {
+    							// before splitting and iterating just compare them for the most common case
+    							var matches = classNames === nodeClassNames;
+    							if (!matches) {
+    								var nodeClassNamesSet = toOrderedSet(nodeClassNames);
+    								matches = classNamesSet.every(arrayIncludes(nodeClassNamesSet));
+    							}
+    							if(matches) {
+    								ls.push(node);
+    							}
+    						}
+    					}
+    				});
+    			}
+    			return ls;
+    		});
+    	},
+
+    	//document factory method:
+    	createElement :	function(tagName){
+    		var node = new Element();
+    		node.ownerDocument = this;
+    		node.nodeName = tagName;
+    		node.tagName = tagName;
+    		node.localName = tagName;
+    		node.childNodes = new NodeList();
+    		var attrs	= node.attributes = new NamedNodeMap();
+    		attrs._ownerElement = node;
+    		return node;
+    	},
+    	createDocumentFragment :	function(){
+    		var node = new DocumentFragment();
+    		node.ownerDocument = this;
+    		node.childNodes = new NodeList();
+    		return node;
+    	},
+    	createTextNode :	function(data){
+    		var node = new Text$1();
+    		node.ownerDocument = this;
+    		node.appendData(data);
+    		return node;
+    	},
+    	createComment :	function(data){
+    		var node = new Comment();
+    		node.ownerDocument = this;
+    		node.appendData(data);
+    		return node;
+    	},
+    	createCDATASection :	function(data){
+    		var node = new CDATASection();
+    		node.ownerDocument = this;
+    		node.appendData(data);
+    		return node;
+    	},
+    	createProcessingInstruction :	function(target,data){
+    		var node = new ProcessingInstruction();
+    		node.ownerDocument = this;
+    		node.tagName = node.nodeName = node.target = target;
+    		node.nodeValue = node.data = data;
+    		return node;
+    	},
+    	createAttribute :	function(name){
+    		var node = new Attr();
+    		node.ownerDocument	= this;
+    		node.name = name;
+    		node.nodeName	= name;
+    		node.localName = name;
+    		node.specified = true;
+    		return node;
+    	},
+    	createEntityReference :	function(name){
+    		var node = new EntityReference();
+    		node.ownerDocument	= this;
+    		node.nodeName	= name;
+    		return node;
+    	},
+    	// Introduced in DOM Level 2:
+    	createElementNS :	function(namespaceURI,qualifiedName){
+    		var node = new Element();
+    		var pl = qualifiedName.split(':');
+    		var attrs	= node.attributes = new NamedNodeMap();
+    		node.childNodes = new NodeList();
+    		node.ownerDocument = this;
+    		node.nodeName = qualifiedName;
+    		node.tagName = qualifiedName;
+    		node.namespaceURI = namespaceURI;
+    		if(pl.length == 2){
+    			node.prefix = pl[0];
+    			node.localName = pl[1];
+    		}else {
+    			//el.prefix = null;
+    			node.localName = qualifiedName;
+    		}
+    		attrs._ownerElement = node;
+    		return node;
+    	},
+    	// Introduced in DOM Level 2:
+    	createAttributeNS :	function(namespaceURI,qualifiedName){
+    		var node = new Attr();
+    		var pl = qualifiedName.split(':');
+    		node.ownerDocument = this;
+    		node.nodeName = qualifiedName;
+    		node.name = qualifiedName;
+    		node.namespaceURI = namespaceURI;
+    		node.specified = true;
+    		if(pl.length == 2){
+    			node.prefix = pl[0];
+    			node.localName = pl[1];
+    		}else {
+    			//el.prefix = null;
+    			node.localName = qualifiedName;
+    		}
+    		return node;
+    	}
+    };
+    _extends(Document,Node$1);
+
+
+    function Element() {
+    	this._nsMap = {};
+    };
+    Element.prototype = {
+    	nodeType : ELEMENT_NODE,
+    	hasAttribute : function(name){
+    		return this.getAttributeNode(name)!=null;
+    	},
+    	getAttribute : function(name){
+    		var attr = this.getAttributeNode(name);
+    		return attr && attr.value || '';
+    	},
+    	getAttributeNode : function(name){
+    		return this.attributes.getNamedItem(name);
+    	},
+    	setAttribute : function(name, value){
+    		var attr = this.ownerDocument.createAttribute(name);
+    		attr.value = attr.nodeValue = "" + value;
+    		this.setAttributeNode(attr);
+    	},
+    	removeAttribute : function(name){
+    		var attr = this.getAttributeNode(name);
+    		attr && this.removeAttributeNode(attr);
+    	},
+
+    	//four real opeartion method
+    	appendChild:function(newChild){
+    		if(newChild.nodeType === DOCUMENT_FRAGMENT_NODE){
+    			return this.insertBefore(newChild,null);
+    		}else {
+    			return _appendSingleChild(this,newChild);
+    		}
+    	},
+    	setAttributeNode : function(newAttr){
+    		return this.attributes.setNamedItem(newAttr);
+    	},
+    	setAttributeNodeNS : function(newAttr){
+    		return this.attributes.setNamedItemNS(newAttr);
+    	},
+    	removeAttributeNode : function(oldAttr){
+    		//console.log(this == oldAttr.ownerElement)
+    		return this.attributes.removeNamedItem(oldAttr.nodeName);
+    	},
+    	//get real attribute name,and remove it by removeAttributeNode
+    	removeAttributeNS : function(namespaceURI, localName){
+    		var old = this.getAttributeNodeNS(namespaceURI, localName);
+    		old && this.removeAttributeNode(old);
+    	},
+
+    	hasAttributeNS : function(namespaceURI, localName){
+    		return this.getAttributeNodeNS(namespaceURI, localName)!=null;
+    	},
+    	getAttributeNS : function(namespaceURI, localName){
+    		var attr = this.getAttributeNodeNS(namespaceURI, localName);
+    		return attr && attr.value || '';
+    	},
+    	setAttributeNS : function(namespaceURI, qualifiedName, value){
+    		var attr = this.ownerDocument.createAttributeNS(namespaceURI, qualifiedName);
+    		attr.value = attr.nodeValue = "" + value;
+    		this.setAttributeNode(attr);
+    	},
+    	getAttributeNodeNS : function(namespaceURI, localName){
+    		return this.attributes.getNamedItemNS(namespaceURI, localName);
+    	},
+
+    	getElementsByTagName : function(tagName){
+    		return new LiveNodeList(this,function(base){
+    			var ls = [];
+    			_visitNode(base,function(node){
+    				if(node !== base && node.nodeType == ELEMENT_NODE && (tagName === '*' || node.tagName == tagName)){
+    					ls.push(node);
+    				}
+    			});
+    			return ls;
+    		});
+    	},
+    	getElementsByTagNameNS : function(namespaceURI, localName){
+    		return new LiveNodeList(this,function(base){
+    			var ls = [];
+    			_visitNode(base,function(node){
+    				if(node !== base && node.nodeType === ELEMENT_NODE && (namespaceURI === '*' || node.namespaceURI === namespaceURI) && (localName === '*' || node.localName == localName)){
+    					ls.push(node);
+    				}
+    			});
+    			return ls;
+
+    		});
+    	}
+    };
+    Document.prototype.getElementsByTagName = Element.prototype.getElementsByTagName;
+    Document.prototype.getElementsByTagNameNS = Element.prototype.getElementsByTagNameNS;
+
+
+    _extends(Element,Node$1);
+    function Attr() {
+    };
+    Attr.prototype.nodeType = ATTRIBUTE_NODE;
+    _extends(Attr,Node$1);
+
+
+    function CharacterData() {
+    };
+    CharacterData.prototype = {
+    	data : '',
+    	substringData : function(offset, count) {
+    		return this.data.substring(offset, offset+count);
+    	},
+    	appendData: function(text) {
+    		text = this.data+text;
+    		this.nodeValue = this.data = text;
+    		this.length = text.length;
+    	},
+    	insertData: function(offset,text) {
+    		this.replaceData(offset,0,text);
+
+    	},
+    	appendChild:function(newChild){
+    		throw new Error(ExceptionMessage[HIERARCHY_REQUEST_ERR])
+    	},
+    	deleteData: function(offset, count) {
+    		this.replaceData(offset,count,"");
+    	},
+    	replaceData: function(offset, count, text) {
+    		var start = this.data.substring(0,offset);
+    		var end = this.data.substring(offset+count);
+    		text = start + text + end;
+    		this.nodeValue = this.data = text;
+    		this.length = text.length;
+    	}
+    };
+    _extends(CharacterData,Node$1);
+    function Text$1() {
+    };
+    Text$1.prototype = {
+    	nodeName : "#text",
+    	nodeType : TEXT_NODE,
+    	splitText : function(offset) {
+    		var text = this.data;
+    		var newText = text.substring(offset);
+    		text = text.substring(0, offset);
+    		this.data = this.nodeValue = text;
+    		this.length = text.length;
+    		var newNode = this.ownerDocument.createTextNode(newText);
+    		if(this.parentNode){
+    			this.parentNode.insertBefore(newNode, this.nextSibling);
+    		}
+    		return newNode;
+    	}
+    };
+    _extends(Text$1,CharacterData);
+    function Comment() {
+    };
+    Comment.prototype = {
+    	nodeName : "#comment",
+    	nodeType : COMMENT_NODE
+    };
+    _extends(Comment,CharacterData);
+
+    function CDATASection() {
+    };
+    CDATASection.prototype = {
+    	nodeName : "#cdata-section",
+    	nodeType : CDATA_SECTION_NODE
+    };
+    _extends(CDATASection,CharacterData);
+
+
+    function DocumentType() {
+    };
+    DocumentType.prototype.nodeType = DOCUMENT_TYPE_NODE;
+    _extends(DocumentType,Node$1);
+
+    function Notation() {
+    };
+    Notation.prototype.nodeType = NOTATION_NODE;
+    _extends(Notation,Node$1);
+
+    function Entity() {
+    };
+    Entity.prototype.nodeType = ENTITY_NODE;
+    _extends(Entity,Node$1);
+
+    function EntityReference() {
+    };
+    EntityReference.prototype.nodeType = ENTITY_REFERENCE_NODE;
+    _extends(EntityReference,Node$1);
+
+    function DocumentFragment() {
+    };
+    DocumentFragment.prototype.nodeName =	"#document-fragment";
+    DocumentFragment.prototype.nodeType =	DOCUMENT_FRAGMENT_NODE;
+    _extends(DocumentFragment,Node$1);
+
+
+    function ProcessingInstruction() {
+    }
+    ProcessingInstruction.prototype.nodeType = PROCESSING_INSTRUCTION_NODE;
+    _extends(ProcessingInstruction,Node$1);
+    function XMLSerializer$2(){}
+    XMLSerializer$2.prototype.serializeToString = function(node,isHtml,nodeFilter){
+    	return nodeSerializeToString.call(node,isHtml,nodeFilter);
+    };
+    Node$1.prototype.toString = nodeSerializeToString;
+    function nodeSerializeToString(isHtml,nodeFilter){
+    	var buf = [];
+    	var refNode = this.nodeType == 9 && this.documentElement || this;
+    	var prefix = refNode.prefix;
+    	var uri = refNode.namespaceURI;
+
+    	if(uri && prefix == null){
+    		//console.log(prefix)
+    		var prefix = refNode.lookupPrefix(uri);
+    		if(prefix == null){
+    			//isHTML = true;
+    			var visibleNamespaces=[
+    			{namespace:uri,prefix:null}
+    			//{namespace:uri,prefix:''}
+    			];
+    		}
+    	}
+    	serializeToString(this,buf,isHtml,nodeFilter,visibleNamespaces);
+    	//console.log('###',this.nodeType,uri,prefix,buf.join(''))
+    	return buf.join('');
+    }
+
+    function needNamespaceDefine(node, isHTML, visibleNamespaces) {
+    	var prefix = node.prefix || '';
+    	var uri = node.namespaceURI;
+    	// According to [Namespaces in XML 1.0](https://www.w3.org/TR/REC-xml-names/#ns-using) ,
+    	// and more specifically https://www.w3.org/TR/REC-xml-names/#nsc-NoPrefixUndecl :
+    	// > In a namespace declaration for a prefix [...], the attribute value MUST NOT be empty.
+    	// in a similar manner [Namespaces in XML 1.1](https://www.w3.org/TR/xml-names11/#ns-using)
+    	// and more specifically https://www.w3.org/TR/xml-names11/#nsc-NSDeclared :
+    	// > [...] Furthermore, the attribute value [...] must not be an empty string.
+    	// so serializing empty namespace value like xmlns:ds="" would produce an invalid XML document.
+    	if (!uri) {
+    		return false;
+    	}
+    	if (prefix === "xml" && uri === NAMESPACE$2.XML || uri === NAMESPACE$2.XMLNS) {
+    		return false;
+    	}
+
+    	var i = visibleNamespaces.length;
+    	while (i--) {
+    		var ns = visibleNamespaces[i];
+    		// get namespace prefix
+    		if (ns.prefix === prefix) {
+    			return ns.namespace !== uri;
+    		}
+    	}
+    	return true;
+    }
+    /**
+     * Well-formed constraint: No < in Attribute Values
+     * > The replacement text of any entity referred to directly or indirectly
+     * > in an attribute value must not contain a <.
+     * @see https://www.w3.org/TR/xml11/#CleanAttrVals
+     * @see https://www.w3.org/TR/xml11/#NT-AttValue
+     *
+     * Literal whitespace other than space that appear in attribute values
+     * are serialized as their entity references, so they will be preserved.
+     * (In contrast to whitespace literals in the input which are normalized to spaces)
+     * @see https://www.w3.org/TR/xml11/#AVNormalize
+     * @see https://w3c.github.io/DOM-Parsing/#serializing-an-element-s-attributes
+     */
+    function addSerializedAttribute(buf, qualifiedName, value) {
+    	buf.push(' ', qualifiedName, '="', value.replace(/[<>&"\t\n\r]/g, _xmlEncoder), '"');
+    }
+
+    function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
+    	if (!visibleNamespaces) {
+    		visibleNamespaces = [];
+    	}
+
+    	if(nodeFilter){
+    		node = nodeFilter(node);
+    		if(node){
+    			if(typeof node == 'string'){
+    				buf.push(node);
+    				return;
+    			}
+    		}else {
+    			return;
+    		}
+    		//buf.sort.apply(attrs, attributeSorter);
+    	}
+
+    	switch(node.nodeType){
+    	case ELEMENT_NODE:
+    		var attrs = node.attributes;
+    		var len = attrs.length;
+    		var child = node.firstChild;
+    		var nodeName = node.tagName;
+
+    		isHTML = NAMESPACE$2.isHTML(node.namespaceURI) || isHTML;
+
+    		var prefixedNodeName = nodeName;
+    		if (!isHTML && !node.prefix && node.namespaceURI) {
+    			var defaultNS;
+    			// lookup current default ns from `xmlns` attribute
+    			for (var ai = 0; ai < attrs.length; ai++) {
+    				if (attrs.item(ai).name === 'xmlns') {
+    					defaultNS = attrs.item(ai).value;
+    					break
+    				}
+    			}
+    			if (!defaultNS) {
+    				// lookup current default ns in visibleNamespaces
+    				for (var nsi = visibleNamespaces.length - 1; nsi >= 0; nsi--) {
+    					var namespace = visibleNamespaces[nsi];
+    					if (namespace.prefix === '' && namespace.namespace === node.namespaceURI) {
+    						defaultNS = namespace.namespace;
+    						break
+    					}
+    				}
+    			}
+    			if (defaultNS !== node.namespaceURI) {
+    				for (var nsi = visibleNamespaces.length - 1; nsi >= 0; nsi--) {
+    					var namespace = visibleNamespaces[nsi];
+    					if (namespace.namespace === node.namespaceURI) {
+    						if (namespace.prefix) {
+    							prefixedNodeName = namespace.prefix + ':' + nodeName;
+    						}
+    						break
+    					}
+    				}
+    			}
+    		}
+
+    		buf.push('<', prefixedNodeName);
+
+    		for(var i=0;i<len;i++){
+    			// add namespaces for attributes
+    			var attr = attrs.item(i);
+    			if (attr.prefix == 'xmlns') {
+    				visibleNamespaces.push({ prefix: attr.localName, namespace: attr.value });
+    			}else if(attr.nodeName == 'xmlns'){
+    				visibleNamespaces.push({ prefix: '', namespace: attr.value });
+    			}
+    		}
+
+    		for(var i=0;i<len;i++){
+    			var attr = attrs.item(i);
+    			if (needNamespaceDefine(attr,isHTML, visibleNamespaces)) {
+    				var prefix = attr.prefix||'';
+    				var uri = attr.namespaceURI;
+    				addSerializedAttribute(buf, prefix ? 'xmlns:' + prefix : "xmlns", uri);
+    				visibleNamespaces.push({ prefix: prefix, namespace:uri });
+    			}
+    			serializeToString(attr,buf,isHTML,nodeFilter,visibleNamespaces);
+    		}
+
+    		// add namespace for current node
+    		if (nodeName === prefixedNodeName && needNamespaceDefine(node, isHTML, visibleNamespaces)) {
+    			var prefix = node.prefix||'';
+    			var uri = node.namespaceURI;
+    			addSerializedAttribute(buf, prefix ? 'xmlns:' + prefix : "xmlns", uri);
+    			visibleNamespaces.push({ prefix: prefix, namespace:uri });
+    		}
+
+    		if(child || isHTML && !/^(?:meta|link|img|br|hr|input)$/i.test(nodeName)){
+    			buf.push('>');
+    			//if is cdata child node
+    			if(isHTML && /^script$/i.test(nodeName)){
+    				while(child){
+    					if(child.data){
+    						buf.push(child.data);
+    					}else {
+    						serializeToString(child, buf, isHTML, nodeFilter, visibleNamespaces.slice());
+    					}
+    					child = child.nextSibling;
+    				}
+    			}else
+    			{
+    				while(child){
+    					serializeToString(child, buf, isHTML, nodeFilter, visibleNamespaces.slice());
+    					child = child.nextSibling;
+    				}
+    			}
+    			buf.push('</',prefixedNodeName,'>');
+    		}else {
+    			buf.push('/>');
+    		}
+    		// remove added visible namespaces
+    		//visibleNamespaces.length = startVisibleNamespaces;
+    		return;
+    	case DOCUMENT_NODE:
+    	case DOCUMENT_FRAGMENT_NODE:
+    		var child = node.firstChild;
+    		while(child){
+    			serializeToString(child, buf, isHTML, nodeFilter, visibleNamespaces.slice());
+    			child = child.nextSibling;
+    		}
+    		return;
+    	case ATTRIBUTE_NODE:
+    		return addSerializedAttribute(buf, node.name, node.value);
+    	case TEXT_NODE:
+    		/**
+    		 * The ampersand character (&) and the left angle bracket (<) must not appear in their literal form,
+    		 * except when used as markup delimiters, or within a comment, a processing instruction, or a CDATA section.
+    		 * If they are needed elsewhere, they must be escaped using either numeric character references or the strings
+    		 * `&amp;` and `&lt;` respectively.
+    		 * The right angle bracket (>) may be represented using the string " &gt; ", and must, for compatibility,
+    		 * be escaped using either `&gt;` or a character reference when it appears in the string `]]>` in content,
+    		 * when that string is not marking the end of a CDATA section.
+    		 *
+    		 * In the content of elements, character data is any string of characters
+    		 * which does not contain the start-delimiter of any markup
+    		 * and does not include the CDATA-section-close delimiter, `]]>`.
+    		 *
+    		 * @see https://www.w3.org/TR/xml/#NT-CharData
+    		 * @see https://w3c.github.io/DOM-Parsing/#xml-serializing-a-text-node
+    		 */
+    		return buf.push(node.data
+    			.replace(/[<&>]/g,_xmlEncoder)
+    		);
+    	case CDATA_SECTION_NODE:
+    		return buf.push( '<![CDATA[',node.data,']]>');
+    	case COMMENT_NODE:
+    		return buf.push( "<!--",node.data,"-->");
+    	case DOCUMENT_TYPE_NODE:
+    		var pubid = node.publicId;
+    		var sysid = node.systemId;
+    		buf.push('<!DOCTYPE ',node.name);
+    		if(pubid){
+    			buf.push(' PUBLIC ', pubid);
+    			if (sysid && sysid!='.') {
+    				buf.push(' ', sysid);
+    			}
+    			buf.push('>');
+    		}else if(sysid && sysid!='.'){
+    			buf.push(' SYSTEM ', sysid, '>');
+    		}else {
+    			var sub = node.internalSubset;
+    			if(sub){
+    				buf.push(" [",sub,"]");
+    			}
+    			buf.push(">");
+    		}
+    		return;
+    	case PROCESSING_INSTRUCTION_NODE:
+    		return buf.push( "<?",node.target," ",node.data,"?>");
+    	case ENTITY_REFERENCE_NODE:
+    		return buf.push( '&',node.nodeName,';');
+    	//case ENTITY_NODE:
+    	//case NOTATION_NODE:
+    	default:
+    		buf.push('??',node.nodeName);
+    	}
+    }
+    function importNode(doc,node,deep){
+    	var node2;
+    	switch (node.nodeType) {
+    	case ELEMENT_NODE:
+    		node2 = node.cloneNode(false);
+    		node2.ownerDocument = doc;
+    		//var attrs = node2.attributes;
+    		//var len = attrs.length;
+    		//for(var i=0;i<len;i++){
+    			//node2.setAttributeNodeNS(importNode(doc,attrs.item(i),deep));
+    		//}
+    	case DOCUMENT_FRAGMENT_NODE:
+    		break;
+    	case ATTRIBUTE_NODE:
+    		deep = true;
+    		break;
+    	//case ENTITY_REFERENCE_NODE:
+    	//case PROCESSING_INSTRUCTION_NODE:
+    	////case TEXT_NODE:
+    	//case CDATA_SECTION_NODE:
+    	//case COMMENT_NODE:
+    	//	deep = false;
+    	//	break;
+    	//case DOCUMENT_NODE:
+    	//case DOCUMENT_TYPE_NODE:
+    	//cannot be imported.
+    	//case ENTITY_NODE:
+    	//case NOTATION_NODE：
+    	//can not hit in level3
+    	//default:throw e;
+    	}
+    	if(!node2){
+    		node2 = node.cloneNode(false);//false
+    	}
+    	node2.ownerDocument = doc;
+    	node2.parentNode = null;
+    	if(deep){
+    		var child = node.firstChild;
+    		while(child){
+    			node2.appendChild(importNode(doc,child,deep));
+    			child = child.nextSibling;
+    		}
+    	}
+    	return node2;
+    }
+    //
+    //var _relationMap = {firstChild:1,lastChild:1,previousSibling:1,nextSibling:1,
+    //					attributes:1,childNodes:1,parentNode:1,documentElement:1,doctype,};
+    function cloneNode(doc,node,deep){
+    	var node2 = new node.constructor();
+    	for (var n in node) {
+    		if (Object.prototype.hasOwnProperty.call(node, n)) {
+    			var v = node[n];
+    			if (typeof v != "object") {
+    				if (v != node2[n]) {
+    					node2[n] = v;
+    				}
+    			}
+    		}
+    	}
+    	if(node.childNodes){
+    		node2.childNodes = new NodeList();
+    	}
+    	node2.ownerDocument = doc;
+    	switch (node2.nodeType) {
+    	case ELEMENT_NODE:
+    		var attrs	= node.attributes;
+    		var attrs2	= node2.attributes = new NamedNodeMap();
+    		var len = attrs.length;
+    		attrs2._ownerElement = node2;
+    		for(var i=0;i<len;i++){
+    			node2.setAttributeNode(cloneNode(doc,attrs.item(i),true));
+    		}
+    		break;;
+    	case ATTRIBUTE_NODE:
+    		deep = true;
+    	}
+    	if(deep){
+    		var child = node.firstChild;
+    		while(child){
+    			node2.appendChild(cloneNode(doc,child,deep));
+    			child = child.nextSibling;
+    		}
+    	}
+    	return node2;
+    }
+
+    function __set__(object,key,value){
+    	object[key] = value;
+    }
+    //do dynamic
+    try{
+    	if(Object.defineProperty){
+    		Object.defineProperty(LiveNodeList.prototype,'length',{
+    			get:function(){
+    				_updateLiveList(this);
+    				return this.$$length;
+    			}
+    		});
+
+    		Object.defineProperty(Node$1.prototype,'textContent',{
+    			get:function(){
+    				return getTextContent(this);
+    			},
+
+    			set:function(data){
+    				switch(this.nodeType){
+    				case ELEMENT_NODE:
+    				case DOCUMENT_FRAGMENT_NODE:
+    					while(this.firstChild){
+    						this.removeChild(this.firstChild);
+    					}
+    					if(data || String(data)){
+    						this.appendChild(this.ownerDocument.createTextNode(data));
+    					}
+    					break;
+
+    				default:
+    					this.data = data;
+    					this.value = data;
+    					this.nodeValue = data;
+    				}
+    			}
+    		});
+
+    		function getTextContent(node){
+    			switch(node.nodeType){
+    			case ELEMENT_NODE:
+    			case DOCUMENT_FRAGMENT_NODE:
+    				var buf = [];
+    				node = node.firstChild;
+    				while(node){
+    					if(node.nodeType!==7 && node.nodeType !==8){
+    						buf.push(getTextContent(node));
+    					}
+    					node = node.nextSibling;
+    				}
+    				return buf.join('');
+    			default:
+    				return node.nodeValue;
+    			}
+    		}
+
+    		__set__ = function(object,key,value){
+    			//console.log(value)
+    			object['$$'+key] = value;
+    		};
+    	}
+    }catch(e){//ie8
+    }
+
+    //if(typeof require == 'function'){
+    	var DocumentType_1 = dom$2.DocumentType = DocumentType;
+    	var DOMException_1 = dom$2.DOMException = DOMException;
+    	var DOMImplementation_1 = dom$2.DOMImplementation = DOMImplementation$2;
+    	var Element_1 = dom$2.Element = Element;
+    	var Node_1 = dom$2.Node = Node$1;
+    	var NodeList_1 = dom$2.NodeList = NodeList;
+    	var XMLSerializer_1 = dom$2.XMLSerializer = XMLSerializer$2;
+
+    var domParser = {};
+
+    var entities$2 = {};
+
+    (function (exports) {
+    	'use strict';
+
+    	var freeze = conventions$2.freeze;
+
+    	/**
+    	 * The entities that are predefined in every XML document.
+    	 *
+    	 * @see https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-predefined-ent W3C XML 1.1
+    	 * @see https://www.w3.org/TR/2008/REC-xml-20081126/#sec-predefined-ent W3C XML 1.0
+    	 * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Predefined_entities_in_XML Wikipedia
+    	 */
+    	exports.XML_ENTITIES = freeze({
+    		amp: '&',
+    		apos: "'",
+    		gt: '>',
+    		lt: '<',
+    		quot: '"',
+    	});
+
+    	/**
+    	 * A map of all entities that are detected in an HTML document.
+    	 * They contain all entries from `XML_ENTITIES`.
+    	 *
+    	 * @see XML_ENTITIES
+    	 * @see DOMParser.parseFromString
+    	 * @see DOMImplementation.prototype.createHTMLDocument
+    	 * @see https://html.spec.whatwg.org/#named-character-references WHATWG HTML(5) Spec
+    	 * @see https://html.spec.whatwg.org/entities.json JSON
+    	 * @see https://www.w3.org/TR/xml-entity-names/ W3C XML Entity Names
+    	 * @see https://www.w3.org/TR/html4/sgml/entities.html W3C HTML4/SGML
+    	 * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Character_entity_references_in_HTML Wikipedia (HTML)
+    	 * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Entities_representing_special_characters_in_XHTML Wikpedia (XHTML)
+    	 */
+    	exports.HTML_ENTITIES = freeze({
+    		Aacute: '\u00C1',
+    		aacute: '\u00E1',
+    		Abreve: '\u0102',
+    		abreve: '\u0103',
+    		ac: '\u223E',
+    		acd: '\u223F',
+    		acE: '\u223E\u0333',
+    		Acirc: '\u00C2',
+    		acirc: '\u00E2',
+    		acute: '\u00B4',
+    		Acy: '\u0410',
+    		acy: '\u0430',
+    		AElig: '\u00C6',
+    		aelig: '\u00E6',
+    		af: '\u2061',
+    		Afr: '\uD835\uDD04',
+    		afr: '\uD835\uDD1E',
+    		Agrave: '\u00C0',
+    		agrave: '\u00E0',
+    		alefsym: '\u2135',
+    		aleph: '\u2135',
+    		Alpha: '\u0391',
+    		alpha: '\u03B1',
+    		Amacr: '\u0100',
+    		amacr: '\u0101',
+    		amalg: '\u2A3F',
+    		AMP: '\u0026',
+    		amp: '\u0026',
+    		And: '\u2A53',
+    		and: '\u2227',
+    		andand: '\u2A55',
+    		andd: '\u2A5C',
+    		andslope: '\u2A58',
+    		andv: '\u2A5A',
+    		ang: '\u2220',
+    		ange: '\u29A4',
+    		angle: '\u2220',
+    		angmsd: '\u2221',
+    		angmsdaa: '\u29A8',
+    		angmsdab: '\u29A9',
+    		angmsdac: '\u29AA',
+    		angmsdad: '\u29AB',
+    		angmsdae: '\u29AC',
+    		angmsdaf: '\u29AD',
+    		angmsdag: '\u29AE',
+    		angmsdah: '\u29AF',
+    		angrt: '\u221F',
+    		angrtvb: '\u22BE',
+    		angrtvbd: '\u299D',
+    		angsph: '\u2222',
+    		angst: '\u00C5',
+    		angzarr: '\u237C',
+    		Aogon: '\u0104',
+    		aogon: '\u0105',
+    		Aopf: '\uD835\uDD38',
+    		aopf: '\uD835\uDD52',
+    		ap: '\u2248',
+    		apacir: '\u2A6F',
+    		apE: '\u2A70',
+    		ape: '\u224A',
+    		apid: '\u224B',
+    		apos: '\u0027',
+    		ApplyFunction: '\u2061',
+    		approx: '\u2248',
+    		approxeq: '\u224A',
+    		Aring: '\u00C5',
+    		aring: '\u00E5',
+    		Ascr: '\uD835\uDC9C',
+    		ascr: '\uD835\uDCB6',
+    		Assign: '\u2254',
+    		ast: '\u002A',
+    		asymp: '\u2248',
+    		asympeq: '\u224D',
+    		Atilde: '\u00C3',
+    		atilde: '\u00E3',
+    		Auml: '\u00C4',
+    		auml: '\u00E4',
+    		awconint: '\u2233',
+    		awint: '\u2A11',
+    		backcong: '\u224C',
+    		backepsilon: '\u03F6',
+    		backprime: '\u2035',
+    		backsim: '\u223D',
+    		backsimeq: '\u22CD',
+    		Backslash: '\u2216',
+    		Barv: '\u2AE7',
+    		barvee: '\u22BD',
+    		Barwed: '\u2306',
+    		barwed: '\u2305',
+    		barwedge: '\u2305',
+    		bbrk: '\u23B5',
+    		bbrktbrk: '\u23B6',
+    		bcong: '\u224C',
+    		Bcy: '\u0411',
+    		bcy: '\u0431',
+    		bdquo: '\u201E',
+    		becaus: '\u2235',
+    		Because: '\u2235',
+    		because: '\u2235',
+    		bemptyv: '\u29B0',
+    		bepsi: '\u03F6',
+    		bernou: '\u212C',
+    		Bernoullis: '\u212C',
+    		Beta: '\u0392',
+    		beta: '\u03B2',
+    		beth: '\u2136',
+    		between: '\u226C',
+    		Bfr: '\uD835\uDD05',
+    		bfr: '\uD835\uDD1F',
+    		bigcap: '\u22C2',
+    		bigcirc: '\u25EF',
+    		bigcup: '\u22C3',
+    		bigodot: '\u2A00',
+    		bigoplus: '\u2A01',
+    		bigotimes: '\u2A02',
+    		bigsqcup: '\u2A06',
+    		bigstar: '\u2605',
+    		bigtriangledown: '\u25BD',
+    		bigtriangleup: '\u25B3',
+    		biguplus: '\u2A04',
+    		bigvee: '\u22C1',
+    		bigwedge: '\u22C0',
+    		bkarow: '\u290D',
+    		blacklozenge: '\u29EB',
+    		blacksquare: '\u25AA',
+    		blacktriangle: '\u25B4',
+    		blacktriangledown: '\u25BE',
+    		blacktriangleleft: '\u25C2',
+    		blacktriangleright: '\u25B8',
+    		blank: '\u2423',
+    		blk12: '\u2592',
+    		blk14: '\u2591',
+    		blk34: '\u2593',
+    		block: '\u2588',
+    		bne: '\u003D\u20E5',
+    		bnequiv: '\u2261\u20E5',
+    		bNot: '\u2AED',
+    		bnot: '\u2310',
+    		Bopf: '\uD835\uDD39',
+    		bopf: '\uD835\uDD53',
+    		bot: '\u22A5',
+    		bottom: '\u22A5',
+    		bowtie: '\u22C8',
+    		boxbox: '\u29C9',
+    		boxDL: '\u2557',
+    		boxDl: '\u2556',
+    		boxdL: '\u2555',
+    		boxdl: '\u2510',
+    		boxDR: '\u2554',
+    		boxDr: '\u2553',
+    		boxdR: '\u2552',
+    		boxdr: '\u250C',
+    		boxH: '\u2550',
+    		boxh: '\u2500',
+    		boxHD: '\u2566',
+    		boxHd: '\u2564',
+    		boxhD: '\u2565',
+    		boxhd: '\u252C',
+    		boxHU: '\u2569',
+    		boxHu: '\u2567',
+    		boxhU: '\u2568',
+    		boxhu: '\u2534',
+    		boxminus: '\u229F',
+    		boxplus: '\u229E',
+    		boxtimes: '\u22A0',
+    		boxUL: '\u255D',
+    		boxUl: '\u255C',
+    		boxuL: '\u255B',
+    		boxul: '\u2518',
+    		boxUR: '\u255A',
+    		boxUr: '\u2559',
+    		boxuR: '\u2558',
+    		boxur: '\u2514',
+    		boxV: '\u2551',
+    		boxv: '\u2502',
+    		boxVH: '\u256C',
+    		boxVh: '\u256B',
+    		boxvH: '\u256A',
+    		boxvh: '\u253C',
+    		boxVL: '\u2563',
+    		boxVl: '\u2562',
+    		boxvL: '\u2561',
+    		boxvl: '\u2524',
+    		boxVR: '\u2560',
+    		boxVr: '\u255F',
+    		boxvR: '\u255E',
+    		boxvr: '\u251C',
+    		bprime: '\u2035',
+    		Breve: '\u02D8',
+    		breve: '\u02D8',
+    		brvbar: '\u00A6',
+    		Bscr: '\u212C',
+    		bscr: '\uD835\uDCB7',
+    		bsemi: '\u204F',
+    		bsim: '\u223D',
+    		bsime: '\u22CD',
+    		bsol: '\u005C',
+    		bsolb: '\u29C5',
+    		bsolhsub: '\u27C8',
+    		bull: '\u2022',
+    		bullet: '\u2022',
+    		bump: '\u224E',
+    		bumpE: '\u2AAE',
+    		bumpe: '\u224F',
+    		Bumpeq: '\u224E',
+    		bumpeq: '\u224F',
+    		Cacute: '\u0106',
+    		cacute: '\u0107',
+    		Cap: '\u22D2',
+    		cap: '\u2229',
+    		capand: '\u2A44',
+    		capbrcup: '\u2A49',
+    		capcap: '\u2A4B',
+    		capcup: '\u2A47',
+    		capdot: '\u2A40',
+    		CapitalDifferentialD: '\u2145',
+    		caps: '\u2229\uFE00',
+    		caret: '\u2041',
+    		caron: '\u02C7',
+    		Cayleys: '\u212D',
+    		ccaps: '\u2A4D',
+    		Ccaron: '\u010C',
+    		ccaron: '\u010D',
+    		Ccedil: '\u00C7',
+    		ccedil: '\u00E7',
+    		Ccirc: '\u0108',
+    		ccirc: '\u0109',
+    		Cconint: '\u2230',
+    		ccups: '\u2A4C',
+    		ccupssm: '\u2A50',
+    		Cdot: '\u010A',
+    		cdot: '\u010B',
+    		cedil: '\u00B8',
+    		Cedilla: '\u00B8',
+    		cemptyv: '\u29B2',
+    		cent: '\u00A2',
+    		CenterDot: '\u00B7',
+    		centerdot: '\u00B7',
+    		Cfr: '\u212D',
+    		cfr: '\uD835\uDD20',
+    		CHcy: '\u0427',
+    		chcy: '\u0447',
+    		check: '\u2713',
+    		checkmark: '\u2713',
+    		Chi: '\u03A7',
+    		chi: '\u03C7',
+    		cir: '\u25CB',
+    		circ: '\u02C6',
+    		circeq: '\u2257',
+    		circlearrowleft: '\u21BA',
+    		circlearrowright: '\u21BB',
+    		circledast: '\u229B',
+    		circledcirc: '\u229A',
+    		circleddash: '\u229D',
+    		CircleDot: '\u2299',
+    		circledR: '\u00AE',
+    		circledS: '\u24C8',
+    		CircleMinus: '\u2296',
+    		CirclePlus: '\u2295',
+    		CircleTimes: '\u2297',
+    		cirE: '\u29C3',
+    		cire: '\u2257',
+    		cirfnint: '\u2A10',
+    		cirmid: '\u2AEF',
+    		cirscir: '\u29C2',
+    		ClockwiseContourIntegral: '\u2232',
+    		CloseCurlyDoubleQuote: '\u201D',
+    		CloseCurlyQuote: '\u2019',
+    		clubs: '\u2663',
+    		clubsuit: '\u2663',
+    		Colon: '\u2237',
+    		colon: '\u003A',
+    		Colone: '\u2A74',
+    		colone: '\u2254',
+    		coloneq: '\u2254',
+    		comma: '\u002C',
+    		commat: '\u0040',
+    		comp: '\u2201',
+    		compfn: '\u2218',
+    		complement: '\u2201',
+    		complexes: '\u2102',
+    		cong: '\u2245',
+    		congdot: '\u2A6D',
+    		Congruent: '\u2261',
+    		Conint: '\u222F',
+    		conint: '\u222E',
+    		ContourIntegral: '\u222E',
+    		Copf: '\u2102',
+    		copf: '\uD835\uDD54',
+    		coprod: '\u2210',
+    		Coproduct: '\u2210',
+    		COPY: '\u00A9',
+    		copy: '\u00A9',
+    		copysr: '\u2117',
+    		CounterClockwiseContourIntegral: '\u2233',
+    		crarr: '\u21B5',
+    		Cross: '\u2A2F',
+    		cross: '\u2717',
+    		Cscr: '\uD835\uDC9E',
+    		cscr: '\uD835\uDCB8',
+    		csub: '\u2ACF',
+    		csube: '\u2AD1',
+    		csup: '\u2AD0',
+    		csupe: '\u2AD2',
+    		ctdot: '\u22EF',
+    		cudarrl: '\u2938',
+    		cudarrr: '\u2935',
+    		cuepr: '\u22DE',
+    		cuesc: '\u22DF',
+    		cularr: '\u21B6',
+    		cularrp: '\u293D',
+    		Cup: '\u22D3',
+    		cup: '\u222A',
+    		cupbrcap: '\u2A48',
+    		CupCap: '\u224D',
+    		cupcap: '\u2A46',
+    		cupcup: '\u2A4A',
+    		cupdot: '\u228D',
+    		cupor: '\u2A45',
+    		cups: '\u222A\uFE00',
+    		curarr: '\u21B7',
+    		curarrm: '\u293C',
+    		curlyeqprec: '\u22DE',
+    		curlyeqsucc: '\u22DF',
+    		curlyvee: '\u22CE',
+    		curlywedge: '\u22CF',
+    		curren: '\u00A4',
+    		curvearrowleft: '\u21B6',
+    		curvearrowright: '\u21B7',
+    		cuvee: '\u22CE',
+    		cuwed: '\u22CF',
+    		cwconint: '\u2232',
+    		cwint: '\u2231',
+    		cylcty: '\u232D',
+    		Dagger: '\u2021',
+    		dagger: '\u2020',
+    		daleth: '\u2138',
+    		Darr: '\u21A1',
+    		dArr: '\u21D3',
+    		darr: '\u2193',
+    		dash: '\u2010',
+    		Dashv: '\u2AE4',
+    		dashv: '\u22A3',
+    		dbkarow: '\u290F',
+    		dblac: '\u02DD',
+    		Dcaron: '\u010E',
+    		dcaron: '\u010F',
+    		Dcy: '\u0414',
+    		dcy: '\u0434',
+    		DD: '\u2145',
+    		dd: '\u2146',
+    		ddagger: '\u2021',
+    		ddarr: '\u21CA',
+    		DDotrahd: '\u2911',
+    		ddotseq: '\u2A77',
+    		deg: '\u00B0',
+    		Del: '\u2207',
+    		Delta: '\u0394',
+    		delta: '\u03B4',
+    		demptyv: '\u29B1',
+    		dfisht: '\u297F',
+    		Dfr: '\uD835\uDD07',
+    		dfr: '\uD835\uDD21',
+    		dHar: '\u2965',
+    		dharl: '\u21C3',
+    		dharr: '\u21C2',
+    		DiacriticalAcute: '\u00B4',
+    		DiacriticalDot: '\u02D9',
+    		DiacriticalDoubleAcute: '\u02DD',
+    		DiacriticalGrave: '\u0060',
+    		DiacriticalTilde: '\u02DC',
+    		diam: '\u22C4',
+    		Diamond: '\u22C4',
+    		diamond: '\u22C4',
+    		diamondsuit: '\u2666',
+    		diams: '\u2666',
+    		die: '\u00A8',
+    		DifferentialD: '\u2146',
+    		digamma: '\u03DD',
+    		disin: '\u22F2',
+    		div: '\u00F7',
+    		divide: '\u00F7',
+    		divideontimes: '\u22C7',
+    		divonx: '\u22C7',
+    		DJcy: '\u0402',
+    		djcy: '\u0452',
+    		dlcorn: '\u231E',
+    		dlcrop: '\u230D',
+    		dollar: '\u0024',
+    		Dopf: '\uD835\uDD3B',
+    		dopf: '\uD835\uDD55',
+    		Dot: '\u00A8',
+    		dot: '\u02D9',
+    		DotDot: '\u20DC',
+    		doteq: '\u2250',
+    		doteqdot: '\u2251',
+    		DotEqual: '\u2250',
+    		dotminus: '\u2238',
+    		dotplus: '\u2214',
+    		dotsquare: '\u22A1',
+    		doublebarwedge: '\u2306',
+    		DoubleContourIntegral: '\u222F',
+    		DoubleDot: '\u00A8',
+    		DoubleDownArrow: '\u21D3',
+    		DoubleLeftArrow: '\u21D0',
+    		DoubleLeftRightArrow: '\u21D4',
+    		DoubleLeftTee: '\u2AE4',
+    		DoubleLongLeftArrow: '\u27F8',
+    		DoubleLongLeftRightArrow: '\u27FA',
+    		DoubleLongRightArrow: '\u27F9',
+    		DoubleRightArrow: '\u21D2',
+    		DoubleRightTee: '\u22A8',
+    		DoubleUpArrow: '\u21D1',
+    		DoubleUpDownArrow: '\u21D5',
+    		DoubleVerticalBar: '\u2225',
+    		DownArrow: '\u2193',
+    		Downarrow: '\u21D3',
+    		downarrow: '\u2193',
+    		DownArrowBar: '\u2913',
+    		DownArrowUpArrow: '\u21F5',
+    		DownBreve: '\u0311',
+    		downdownarrows: '\u21CA',
+    		downharpoonleft: '\u21C3',
+    		downharpoonright: '\u21C2',
+    		DownLeftRightVector: '\u2950',
+    		DownLeftTeeVector: '\u295E',
+    		DownLeftVector: '\u21BD',
+    		DownLeftVectorBar: '\u2956',
+    		DownRightTeeVector: '\u295F',
+    		DownRightVector: '\u21C1',
+    		DownRightVectorBar: '\u2957',
+    		DownTee: '\u22A4',
+    		DownTeeArrow: '\u21A7',
+    		drbkarow: '\u2910',
+    		drcorn: '\u231F',
+    		drcrop: '\u230C',
+    		Dscr: '\uD835\uDC9F',
+    		dscr: '\uD835\uDCB9',
+    		DScy: '\u0405',
+    		dscy: '\u0455',
+    		dsol: '\u29F6',
+    		Dstrok: '\u0110',
+    		dstrok: '\u0111',
+    		dtdot: '\u22F1',
+    		dtri: '\u25BF',
+    		dtrif: '\u25BE',
+    		duarr: '\u21F5',
+    		duhar: '\u296F',
+    		dwangle: '\u29A6',
+    		DZcy: '\u040F',
+    		dzcy: '\u045F',
+    		dzigrarr: '\u27FF',
+    		Eacute: '\u00C9',
+    		eacute: '\u00E9',
+    		easter: '\u2A6E',
+    		Ecaron: '\u011A',
+    		ecaron: '\u011B',
+    		ecir: '\u2256',
+    		Ecirc: '\u00CA',
+    		ecirc: '\u00EA',
+    		ecolon: '\u2255',
+    		Ecy: '\u042D',
+    		ecy: '\u044D',
+    		eDDot: '\u2A77',
+    		Edot: '\u0116',
+    		eDot: '\u2251',
+    		edot: '\u0117',
+    		ee: '\u2147',
+    		efDot: '\u2252',
+    		Efr: '\uD835\uDD08',
+    		efr: '\uD835\uDD22',
+    		eg: '\u2A9A',
+    		Egrave: '\u00C8',
+    		egrave: '\u00E8',
+    		egs: '\u2A96',
+    		egsdot: '\u2A98',
+    		el: '\u2A99',
+    		Element: '\u2208',
+    		elinters: '\u23E7',
+    		ell: '\u2113',
+    		els: '\u2A95',
+    		elsdot: '\u2A97',
+    		Emacr: '\u0112',
+    		emacr: '\u0113',
+    		empty: '\u2205',
+    		emptyset: '\u2205',
+    		EmptySmallSquare: '\u25FB',
+    		emptyv: '\u2205',
+    		EmptyVerySmallSquare: '\u25AB',
+    		emsp: '\u2003',
+    		emsp13: '\u2004',
+    		emsp14: '\u2005',
+    		ENG: '\u014A',
+    		eng: '\u014B',
+    		ensp: '\u2002',
+    		Eogon: '\u0118',
+    		eogon: '\u0119',
+    		Eopf: '\uD835\uDD3C',
+    		eopf: '\uD835\uDD56',
+    		epar: '\u22D5',
+    		eparsl: '\u29E3',
+    		eplus: '\u2A71',
+    		epsi: '\u03B5',
+    		Epsilon: '\u0395',
+    		epsilon: '\u03B5',
+    		epsiv: '\u03F5',
+    		eqcirc: '\u2256',
+    		eqcolon: '\u2255',
+    		eqsim: '\u2242',
+    		eqslantgtr: '\u2A96',
+    		eqslantless: '\u2A95',
+    		Equal: '\u2A75',
+    		equals: '\u003D',
+    		EqualTilde: '\u2242',
+    		equest: '\u225F',
+    		Equilibrium: '\u21CC',
+    		equiv: '\u2261',
+    		equivDD: '\u2A78',
+    		eqvparsl: '\u29E5',
+    		erarr: '\u2971',
+    		erDot: '\u2253',
+    		Escr: '\u2130',
+    		escr: '\u212F',
+    		esdot: '\u2250',
+    		Esim: '\u2A73',
+    		esim: '\u2242',
+    		Eta: '\u0397',
+    		eta: '\u03B7',
+    		ETH: '\u00D0',
+    		eth: '\u00F0',
+    		Euml: '\u00CB',
+    		euml: '\u00EB',
+    		euro: '\u20AC',
+    		excl: '\u0021',
+    		exist: '\u2203',
+    		Exists: '\u2203',
+    		expectation: '\u2130',
+    		ExponentialE: '\u2147',
+    		exponentiale: '\u2147',
+    		fallingdotseq: '\u2252',
+    		Fcy: '\u0424',
+    		fcy: '\u0444',
+    		female: '\u2640',
+    		ffilig: '\uFB03',
+    		fflig: '\uFB00',
+    		ffllig: '\uFB04',
+    		Ffr: '\uD835\uDD09',
+    		ffr: '\uD835\uDD23',
+    		filig: '\uFB01',
+    		FilledSmallSquare: '\u25FC',
+    		FilledVerySmallSquare: '\u25AA',
+    		fjlig: '\u0066\u006A',
+    		flat: '\u266D',
+    		fllig: '\uFB02',
+    		fltns: '\u25B1',
+    		fnof: '\u0192',
+    		Fopf: '\uD835\uDD3D',
+    		fopf: '\uD835\uDD57',
+    		ForAll: '\u2200',
+    		forall: '\u2200',
+    		fork: '\u22D4',
+    		forkv: '\u2AD9',
+    		Fouriertrf: '\u2131',
+    		fpartint: '\u2A0D',
+    		frac12: '\u00BD',
+    		frac13: '\u2153',
+    		frac14: '\u00BC',
+    		frac15: '\u2155',
+    		frac16: '\u2159',
+    		frac18: '\u215B',
+    		frac23: '\u2154',
+    		frac25: '\u2156',
+    		frac34: '\u00BE',
+    		frac35: '\u2157',
+    		frac38: '\u215C',
+    		frac45: '\u2158',
+    		frac56: '\u215A',
+    		frac58: '\u215D',
+    		frac78: '\u215E',
+    		frasl: '\u2044',
+    		frown: '\u2322',
+    		Fscr: '\u2131',
+    		fscr: '\uD835\uDCBB',
+    		gacute: '\u01F5',
+    		Gamma: '\u0393',
+    		gamma: '\u03B3',
+    		Gammad: '\u03DC',
+    		gammad: '\u03DD',
+    		gap: '\u2A86',
+    		Gbreve: '\u011E',
+    		gbreve: '\u011F',
+    		Gcedil: '\u0122',
+    		Gcirc: '\u011C',
+    		gcirc: '\u011D',
+    		Gcy: '\u0413',
+    		gcy: '\u0433',
+    		Gdot: '\u0120',
+    		gdot: '\u0121',
+    		gE: '\u2267',
+    		ge: '\u2265',
+    		gEl: '\u2A8C',
+    		gel: '\u22DB',
+    		geq: '\u2265',
+    		geqq: '\u2267',
+    		geqslant: '\u2A7E',
+    		ges: '\u2A7E',
+    		gescc: '\u2AA9',
+    		gesdot: '\u2A80',
+    		gesdoto: '\u2A82',
+    		gesdotol: '\u2A84',
+    		gesl: '\u22DB\uFE00',
+    		gesles: '\u2A94',
+    		Gfr: '\uD835\uDD0A',
+    		gfr: '\uD835\uDD24',
+    		Gg: '\u22D9',
+    		gg: '\u226B',
+    		ggg: '\u22D9',
+    		gimel: '\u2137',
+    		GJcy: '\u0403',
+    		gjcy: '\u0453',
+    		gl: '\u2277',
+    		gla: '\u2AA5',
+    		glE: '\u2A92',
+    		glj: '\u2AA4',
+    		gnap: '\u2A8A',
+    		gnapprox: '\u2A8A',
+    		gnE: '\u2269',
+    		gne: '\u2A88',
+    		gneq: '\u2A88',
+    		gneqq: '\u2269',
+    		gnsim: '\u22E7',
+    		Gopf: '\uD835\uDD3E',
+    		gopf: '\uD835\uDD58',
+    		grave: '\u0060',
+    		GreaterEqual: '\u2265',
+    		GreaterEqualLess: '\u22DB',
+    		GreaterFullEqual: '\u2267',
+    		GreaterGreater: '\u2AA2',
+    		GreaterLess: '\u2277',
+    		GreaterSlantEqual: '\u2A7E',
+    		GreaterTilde: '\u2273',
+    		Gscr: '\uD835\uDCA2',
+    		gscr: '\u210A',
+    		gsim: '\u2273',
+    		gsime: '\u2A8E',
+    		gsiml: '\u2A90',
+    		Gt: '\u226B',
+    		GT: '\u003E',
+    		gt: '\u003E',
+    		gtcc: '\u2AA7',
+    		gtcir: '\u2A7A',
+    		gtdot: '\u22D7',
+    		gtlPar: '\u2995',
+    		gtquest: '\u2A7C',
+    		gtrapprox: '\u2A86',
+    		gtrarr: '\u2978',
+    		gtrdot: '\u22D7',
+    		gtreqless: '\u22DB',
+    		gtreqqless: '\u2A8C',
+    		gtrless: '\u2277',
+    		gtrsim: '\u2273',
+    		gvertneqq: '\u2269\uFE00',
+    		gvnE: '\u2269\uFE00',
+    		Hacek: '\u02C7',
+    		hairsp: '\u200A',
+    		half: '\u00BD',
+    		hamilt: '\u210B',
+    		HARDcy: '\u042A',
+    		hardcy: '\u044A',
+    		hArr: '\u21D4',
+    		harr: '\u2194',
+    		harrcir: '\u2948',
+    		harrw: '\u21AD',
+    		Hat: '\u005E',
+    		hbar: '\u210F',
+    		Hcirc: '\u0124',
+    		hcirc: '\u0125',
+    		hearts: '\u2665',
+    		heartsuit: '\u2665',
+    		hellip: '\u2026',
+    		hercon: '\u22B9',
+    		Hfr: '\u210C',
+    		hfr: '\uD835\uDD25',
+    		HilbertSpace: '\u210B',
+    		hksearow: '\u2925',
+    		hkswarow: '\u2926',
+    		hoarr: '\u21FF',
+    		homtht: '\u223B',
+    		hookleftarrow: '\u21A9',
+    		hookrightarrow: '\u21AA',
+    		Hopf: '\u210D',
+    		hopf: '\uD835\uDD59',
+    		horbar: '\u2015',
+    		HorizontalLine: '\u2500',
+    		Hscr: '\u210B',
+    		hscr: '\uD835\uDCBD',
+    		hslash: '\u210F',
+    		Hstrok: '\u0126',
+    		hstrok: '\u0127',
+    		HumpDownHump: '\u224E',
+    		HumpEqual: '\u224F',
+    		hybull: '\u2043',
+    		hyphen: '\u2010',
+    		Iacute: '\u00CD',
+    		iacute: '\u00ED',
+    		ic: '\u2063',
+    		Icirc: '\u00CE',
+    		icirc: '\u00EE',
+    		Icy: '\u0418',
+    		icy: '\u0438',
+    		Idot: '\u0130',
+    		IEcy: '\u0415',
+    		iecy: '\u0435',
+    		iexcl: '\u00A1',
+    		iff: '\u21D4',
+    		Ifr: '\u2111',
+    		ifr: '\uD835\uDD26',
+    		Igrave: '\u00CC',
+    		igrave: '\u00EC',
+    		ii: '\u2148',
+    		iiiint: '\u2A0C',
+    		iiint: '\u222D',
+    		iinfin: '\u29DC',
+    		iiota: '\u2129',
+    		IJlig: '\u0132',
+    		ijlig: '\u0133',
+    		Im: '\u2111',
+    		Imacr: '\u012A',
+    		imacr: '\u012B',
+    		image: '\u2111',
+    		ImaginaryI: '\u2148',
+    		imagline: '\u2110',
+    		imagpart: '\u2111',
+    		imath: '\u0131',
+    		imof: '\u22B7',
+    		imped: '\u01B5',
+    		Implies: '\u21D2',
+    		in: '\u2208',
+    		incare: '\u2105',
+    		infin: '\u221E',
+    		infintie: '\u29DD',
+    		inodot: '\u0131',
+    		Int: '\u222C',
+    		int: '\u222B',
+    		intcal: '\u22BA',
+    		integers: '\u2124',
+    		Integral: '\u222B',
+    		intercal: '\u22BA',
+    		Intersection: '\u22C2',
+    		intlarhk: '\u2A17',
+    		intprod: '\u2A3C',
+    		InvisibleComma: '\u2063',
+    		InvisibleTimes: '\u2062',
+    		IOcy: '\u0401',
+    		iocy: '\u0451',
+    		Iogon: '\u012E',
+    		iogon: '\u012F',
+    		Iopf: '\uD835\uDD40',
+    		iopf: '\uD835\uDD5A',
+    		Iota: '\u0399',
+    		iota: '\u03B9',
+    		iprod: '\u2A3C',
+    		iquest: '\u00BF',
+    		Iscr: '\u2110',
+    		iscr: '\uD835\uDCBE',
+    		isin: '\u2208',
+    		isindot: '\u22F5',
+    		isinE: '\u22F9',
+    		isins: '\u22F4',
+    		isinsv: '\u22F3',
+    		isinv: '\u2208',
+    		it: '\u2062',
+    		Itilde: '\u0128',
+    		itilde: '\u0129',
+    		Iukcy: '\u0406',
+    		iukcy: '\u0456',
+    		Iuml: '\u00CF',
+    		iuml: '\u00EF',
+    		Jcirc: '\u0134',
+    		jcirc: '\u0135',
+    		Jcy: '\u0419',
+    		jcy: '\u0439',
+    		Jfr: '\uD835\uDD0D',
+    		jfr: '\uD835\uDD27',
+    		jmath: '\u0237',
+    		Jopf: '\uD835\uDD41',
+    		jopf: '\uD835\uDD5B',
+    		Jscr: '\uD835\uDCA5',
+    		jscr: '\uD835\uDCBF',
+    		Jsercy: '\u0408',
+    		jsercy: '\u0458',
+    		Jukcy: '\u0404',
+    		jukcy: '\u0454',
+    		Kappa: '\u039A',
+    		kappa: '\u03BA',
+    		kappav: '\u03F0',
+    		Kcedil: '\u0136',
+    		kcedil: '\u0137',
+    		Kcy: '\u041A',
+    		kcy: '\u043A',
+    		Kfr: '\uD835\uDD0E',
+    		kfr: '\uD835\uDD28',
+    		kgreen: '\u0138',
+    		KHcy: '\u0425',
+    		khcy: '\u0445',
+    		KJcy: '\u040C',
+    		kjcy: '\u045C',
+    		Kopf: '\uD835\uDD42',
+    		kopf: '\uD835\uDD5C',
+    		Kscr: '\uD835\uDCA6',
+    		kscr: '\uD835\uDCC0',
+    		lAarr: '\u21DA',
+    		Lacute: '\u0139',
+    		lacute: '\u013A',
+    		laemptyv: '\u29B4',
+    		lagran: '\u2112',
+    		Lambda: '\u039B',
+    		lambda: '\u03BB',
+    		Lang: '\u27EA',
+    		lang: '\u27E8',
+    		langd: '\u2991',
+    		langle: '\u27E8',
+    		lap: '\u2A85',
+    		Laplacetrf: '\u2112',
+    		laquo: '\u00AB',
+    		Larr: '\u219E',
+    		lArr: '\u21D0',
+    		larr: '\u2190',
+    		larrb: '\u21E4',
+    		larrbfs: '\u291F',
+    		larrfs: '\u291D',
+    		larrhk: '\u21A9',
+    		larrlp: '\u21AB',
+    		larrpl: '\u2939',
+    		larrsim: '\u2973',
+    		larrtl: '\u21A2',
+    		lat: '\u2AAB',
+    		lAtail: '\u291B',
+    		latail: '\u2919',
+    		late: '\u2AAD',
+    		lates: '\u2AAD\uFE00',
+    		lBarr: '\u290E',
+    		lbarr: '\u290C',
+    		lbbrk: '\u2772',
+    		lbrace: '\u007B',
+    		lbrack: '\u005B',
+    		lbrke: '\u298B',
+    		lbrksld: '\u298F',
+    		lbrkslu: '\u298D',
+    		Lcaron: '\u013D',
+    		lcaron: '\u013E',
+    		Lcedil: '\u013B',
+    		lcedil: '\u013C',
+    		lceil: '\u2308',
+    		lcub: '\u007B',
+    		Lcy: '\u041B',
+    		lcy: '\u043B',
+    		ldca: '\u2936',
+    		ldquo: '\u201C',
+    		ldquor: '\u201E',
+    		ldrdhar: '\u2967',
+    		ldrushar: '\u294B',
+    		ldsh: '\u21B2',
+    		lE: '\u2266',
+    		le: '\u2264',
+    		LeftAngleBracket: '\u27E8',
+    		LeftArrow: '\u2190',
+    		Leftarrow: '\u21D0',
+    		leftarrow: '\u2190',
+    		LeftArrowBar: '\u21E4',
+    		LeftArrowRightArrow: '\u21C6',
+    		leftarrowtail: '\u21A2',
+    		LeftCeiling: '\u2308',
+    		LeftDoubleBracket: '\u27E6',
+    		LeftDownTeeVector: '\u2961',
+    		LeftDownVector: '\u21C3',
+    		LeftDownVectorBar: '\u2959',
+    		LeftFloor: '\u230A',
+    		leftharpoondown: '\u21BD',
+    		leftharpoonup: '\u21BC',
+    		leftleftarrows: '\u21C7',
+    		LeftRightArrow: '\u2194',
+    		Leftrightarrow: '\u21D4',
+    		leftrightarrow: '\u2194',
+    		leftrightarrows: '\u21C6',
+    		leftrightharpoons: '\u21CB',
+    		leftrightsquigarrow: '\u21AD',
+    		LeftRightVector: '\u294E',
+    		LeftTee: '\u22A3',
+    		LeftTeeArrow: '\u21A4',
+    		LeftTeeVector: '\u295A',
+    		leftthreetimes: '\u22CB',
+    		LeftTriangle: '\u22B2',
+    		LeftTriangleBar: '\u29CF',
+    		LeftTriangleEqual: '\u22B4',
+    		LeftUpDownVector: '\u2951',
+    		LeftUpTeeVector: '\u2960',
+    		LeftUpVector: '\u21BF',
+    		LeftUpVectorBar: '\u2958',
+    		LeftVector: '\u21BC',
+    		LeftVectorBar: '\u2952',
+    		lEg: '\u2A8B',
+    		leg: '\u22DA',
+    		leq: '\u2264',
+    		leqq: '\u2266',
+    		leqslant: '\u2A7D',
+    		les: '\u2A7D',
+    		lescc: '\u2AA8',
+    		lesdot: '\u2A7F',
+    		lesdoto: '\u2A81',
+    		lesdotor: '\u2A83',
+    		lesg: '\u22DA\uFE00',
+    		lesges: '\u2A93',
+    		lessapprox: '\u2A85',
+    		lessdot: '\u22D6',
+    		lesseqgtr: '\u22DA',
+    		lesseqqgtr: '\u2A8B',
+    		LessEqualGreater: '\u22DA',
+    		LessFullEqual: '\u2266',
+    		LessGreater: '\u2276',
+    		lessgtr: '\u2276',
+    		LessLess: '\u2AA1',
+    		lesssim: '\u2272',
+    		LessSlantEqual: '\u2A7D',
+    		LessTilde: '\u2272',
+    		lfisht: '\u297C',
+    		lfloor: '\u230A',
+    		Lfr: '\uD835\uDD0F',
+    		lfr: '\uD835\uDD29',
+    		lg: '\u2276',
+    		lgE: '\u2A91',
+    		lHar: '\u2962',
+    		lhard: '\u21BD',
+    		lharu: '\u21BC',
+    		lharul: '\u296A',
+    		lhblk: '\u2584',
+    		LJcy: '\u0409',
+    		ljcy: '\u0459',
+    		Ll: '\u22D8',
+    		ll: '\u226A',
+    		llarr: '\u21C7',
+    		llcorner: '\u231E',
+    		Lleftarrow: '\u21DA',
+    		llhard: '\u296B',
+    		lltri: '\u25FA',
+    		Lmidot: '\u013F',
+    		lmidot: '\u0140',
+    		lmoust: '\u23B0',
+    		lmoustache: '\u23B0',
+    		lnap: '\u2A89',
+    		lnapprox: '\u2A89',
+    		lnE: '\u2268',
+    		lne: '\u2A87',
+    		lneq: '\u2A87',
+    		lneqq: '\u2268',
+    		lnsim: '\u22E6',
+    		loang: '\u27EC',
+    		loarr: '\u21FD',
+    		lobrk: '\u27E6',
+    		LongLeftArrow: '\u27F5',
+    		Longleftarrow: '\u27F8',
+    		longleftarrow: '\u27F5',
+    		LongLeftRightArrow: '\u27F7',
+    		Longleftrightarrow: '\u27FA',
+    		longleftrightarrow: '\u27F7',
+    		longmapsto: '\u27FC',
+    		LongRightArrow: '\u27F6',
+    		Longrightarrow: '\u27F9',
+    		longrightarrow: '\u27F6',
+    		looparrowleft: '\u21AB',
+    		looparrowright: '\u21AC',
+    		lopar: '\u2985',
+    		Lopf: '\uD835\uDD43',
+    		lopf: '\uD835\uDD5D',
+    		loplus: '\u2A2D',
+    		lotimes: '\u2A34',
+    		lowast: '\u2217',
+    		lowbar: '\u005F',
+    		LowerLeftArrow: '\u2199',
+    		LowerRightArrow: '\u2198',
+    		loz: '\u25CA',
+    		lozenge: '\u25CA',
+    		lozf: '\u29EB',
+    		lpar: '\u0028',
+    		lparlt: '\u2993',
+    		lrarr: '\u21C6',
+    		lrcorner: '\u231F',
+    		lrhar: '\u21CB',
+    		lrhard: '\u296D',
+    		lrm: '\u200E',
+    		lrtri: '\u22BF',
+    		lsaquo: '\u2039',
+    		Lscr: '\u2112',
+    		lscr: '\uD835\uDCC1',
+    		Lsh: '\u21B0',
+    		lsh: '\u21B0',
+    		lsim: '\u2272',
+    		lsime: '\u2A8D',
+    		lsimg: '\u2A8F',
+    		lsqb: '\u005B',
+    		lsquo: '\u2018',
+    		lsquor: '\u201A',
+    		Lstrok: '\u0141',
+    		lstrok: '\u0142',
+    		Lt: '\u226A',
+    		LT: '\u003C',
+    		lt: '\u003C',
+    		ltcc: '\u2AA6',
+    		ltcir: '\u2A79',
+    		ltdot: '\u22D6',
+    		lthree: '\u22CB',
+    		ltimes: '\u22C9',
+    		ltlarr: '\u2976',
+    		ltquest: '\u2A7B',
+    		ltri: '\u25C3',
+    		ltrie: '\u22B4',
+    		ltrif: '\u25C2',
+    		ltrPar: '\u2996',
+    		lurdshar: '\u294A',
+    		luruhar: '\u2966',
+    		lvertneqq: '\u2268\uFE00',
+    		lvnE: '\u2268\uFE00',
+    		macr: '\u00AF',
+    		male: '\u2642',
+    		malt: '\u2720',
+    		maltese: '\u2720',
+    		Map: '\u2905',
+    		map: '\u21A6',
+    		mapsto: '\u21A6',
+    		mapstodown: '\u21A7',
+    		mapstoleft: '\u21A4',
+    		mapstoup: '\u21A5',
+    		marker: '\u25AE',
+    		mcomma: '\u2A29',
+    		Mcy: '\u041C',
+    		mcy: '\u043C',
+    		mdash: '\u2014',
+    		mDDot: '\u223A',
+    		measuredangle: '\u2221',
+    		MediumSpace: '\u205F',
+    		Mellintrf: '\u2133',
+    		Mfr: '\uD835\uDD10',
+    		mfr: '\uD835\uDD2A',
+    		mho: '\u2127',
+    		micro: '\u00B5',
+    		mid: '\u2223',
+    		midast: '\u002A',
+    		midcir: '\u2AF0',
+    		middot: '\u00B7',
+    		minus: '\u2212',
+    		minusb: '\u229F',
+    		minusd: '\u2238',
+    		minusdu: '\u2A2A',
+    		MinusPlus: '\u2213',
+    		mlcp: '\u2ADB',
+    		mldr: '\u2026',
+    		mnplus: '\u2213',
+    		models: '\u22A7',
+    		Mopf: '\uD835\uDD44',
+    		mopf: '\uD835\uDD5E',
+    		mp: '\u2213',
+    		Mscr: '\u2133',
+    		mscr: '\uD835\uDCC2',
+    		mstpos: '\u223E',
+    		Mu: '\u039C',
+    		mu: '\u03BC',
+    		multimap: '\u22B8',
+    		mumap: '\u22B8',
+    		nabla: '\u2207',
+    		Nacute: '\u0143',
+    		nacute: '\u0144',
+    		nang: '\u2220\u20D2',
+    		nap: '\u2249',
+    		napE: '\u2A70\u0338',
+    		napid: '\u224B\u0338',
+    		napos: '\u0149',
+    		napprox: '\u2249',
+    		natur: '\u266E',
+    		natural: '\u266E',
+    		naturals: '\u2115',
+    		nbsp: '\u00A0',
+    		nbump: '\u224E\u0338',
+    		nbumpe: '\u224F\u0338',
+    		ncap: '\u2A43',
+    		Ncaron: '\u0147',
+    		ncaron: '\u0148',
+    		Ncedil: '\u0145',
+    		ncedil: '\u0146',
+    		ncong: '\u2247',
+    		ncongdot: '\u2A6D\u0338',
+    		ncup: '\u2A42',
+    		Ncy: '\u041D',
+    		ncy: '\u043D',
+    		ndash: '\u2013',
+    		ne: '\u2260',
+    		nearhk: '\u2924',
+    		neArr: '\u21D7',
+    		nearr: '\u2197',
+    		nearrow: '\u2197',
+    		nedot: '\u2250\u0338',
+    		NegativeMediumSpace: '\u200B',
+    		NegativeThickSpace: '\u200B',
+    		NegativeThinSpace: '\u200B',
+    		NegativeVeryThinSpace: '\u200B',
+    		nequiv: '\u2262',
+    		nesear: '\u2928',
+    		nesim: '\u2242\u0338',
+    		NestedGreaterGreater: '\u226B',
+    		NestedLessLess: '\u226A',
+    		NewLine: '\u000A',
+    		nexist: '\u2204',
+    		nexists: '\u2204',
+    		Nfr: '\uD835\uDD11',
+    		nfr: '\uD835\uDD2B',
+    		ngE: '\u2267\u0338',
+    		nge: '\u2271',
+    		ngeq: '\u2271',
+    		ngeqq: '\u2267\u0338',
+    		ngeqslant: '\u2A7E\u0338',
+    		nges: '\u2A7E\u0338',
+    		nGg: '\u22D9\u0338',
+    		ngsim: '\u2275',
+    		nGt: '\u226B\u20D2',
+    		ngt: '\u226F',
+    		ngtr: '\u226F',
+    		nGtv: '\u226B\u0338',
+    		nhArr: '\u21CE',
+    		nharr: '\u21AE',
+    		nhpar: '\u2AF2',
+    		ni: '\u220B',
+    		nis: '\u22FC',
+    		nisd: '\u22FA',
+    		niv: '\u220B',
+    		NJcy: '\u040A',
+    		njcy: '\u045A',
+    		nlArr: '\u21CD',
+    		nlarr: '\u219A',
+    		nldr: '\u2025',
+    		nlE: '\u2266\u0338',
+    		nle: '\u2270',
+    		nLeftarrow: '\u21CD',
+    		nleftarrow: '\u219A',
+    		nLeftrightarrow: '\u21CE',
+    		nleftrightarrow: '\u21AE',
+    		nleq: '\u2270',
+    		nleqq: '\u2266\u0338',
+    		nleqslant: '\u2A7D\u0338',
+    		nles: '\u2A7D\u0338',
+    		nless: '\u226E',
+    		nLl: '\u22D8\u0338',
+    		nlsim: '\u2274',
+    		nLt: '\u226A\u20D2',
+    		nlt: '\u226E',
+    		nltri: '\u22EA',
+    		nltrie: '\u22EC',
+    		nLtv: '\u226A\u0338',
+    		nmid: '\u2224',
+    		NoBreak: '\u2060',
+    		NonBreakingSpace: '\u00A0',
+    		Nopf: '\u2115',
+    		nopf: '\uD835\uDD5F',
+    		Not: '\u2AEC',
+    		not: '\u00AC',
+    		NotCongruent: '\u2262',
+    		NotCupCap: '\u226D',
+    		NotDoubleVerticalBar: '\u2226',
+    		NotElement: '\u2209',
+    		NotEqual: '\u2260',
+    		NotEqualTilde: '\u2242\u0338',
+    		NotExists: '\u2204',
+    		NotGreater: '\u226F',
+    		NotGreaterEqual: '\u2271',
+    		NotGreaterFullEqual: '\u2267\u0338',
+    		NotGreaterGreater: '\u226B\u0338',
+    		NotGreaterLess: '\u2279',
+    		NotGreaterSlantEqual: '\u2A7E\u0338',
+    		NotGreaterTilde: '\u2275',
+    		NotHumpDownHump: '\u224E\u0338',
+    		NotHumpEqual: '\u224F\u0338',
+    		notin: '\u2209',
+    		notindot: '\u22F5\u0338',
+    		notinE: '\u22F9\u0338',
+    		notinva: '\u2209',
+    		notinvb: '\u22F7',
+    		notinvc: '\u22F6',
+    		NotLeftTriangle: '\u22EA',
+    		NotLeftTriangleBar: '\u29CF\u0338',
+    		NotLeftTriangleEqual: '\u22EC',
+    		NotLess: '\u226E',
+    		NotLessEqual: '\u2270',
+    		NotLessGreater: '\u2278',
+    		NotLessLess: '\u226A\u0338',
+    		NotLessSlantEqual: '\u2A7D\u0338',
+    		NotLessTilde: '\u2274',
+    		NotNestedGreaterGreater: '\u2AA2\u0338',
+    		NotNestedLessLess: '\u2AA1\u0338',
+    		notni: '\u220C',
+    		notniva: '\u220C',
+    		notnivb: '\u22FE',
+    		notnivc: '\u22FD',
+    		NotPrecedes: '\u2280',
+    		NotPrecedesEqual: '\u2AAF\u0338',
+    		NotPrecedesSlantEqual: '\u22E0',
+    		NotReverseElement: '\u220C',
+    		NotRightTriangle: '\u22EB',
+    		NotRightTriangleBar: '\u29D0\u0338',
+    		NotRightTriangleEqual: '\u22ED',
+    		NotSquareSubset: '\u228F\u0338',
+    		NotSquareSubsetEqual: '\u22E2',
+    		NotSquareSuperset: '\u2290\u0338',
+    		NotSquareSupersetEqual: '\u22E3',
+    		NotSubset: '\u2282\u20D2',
+    		NotSubsetEqual: '\u2288',
+    		NotSucceeds: '\u2281',
+    		NotSucceedsEqual: '\u2AB0\u0338',
+    		NotSucceedsSlantEqual: '\u22E1',
+    		NotSucceedsTilde: '\u227F\u0338',
+    		NotSuperset: '\u2283\u20D2',
+    		NotSupersetEqual: '\u2289',
+    		NotTilde: '\u2241',
+    		NotTildeEqual: '\u2244',
+    		NotTildeFullEqual: '\u2247',
+    		NotTildeTilde: '\u2249',
+    		NotVerticalBar: '\u2224',
+    		npar: '\u2226',
+    		nparallel: '\u2226',
+    		nparsl: '\u2AFD\u20E5',
+    		npart: '\u2202\u0338',
+    		npolint: '\u2A14',
+    		npr: '\u2280',
+    		nprcue: '\u22E0',
+    		npre: '\u2AAF\u0338',
+    		nprec: '\u2280',
+    		npreceq: '\u2AAF\u0338',
+    		nrArr: '\u21CF',
+    		nrarr: '\u219B',
+    		nrarrc: '\u2933\u0338',
+    		nrarrw: '\u219D\u0338',
+    		nRightarrow: '\u21CF',
+    		nrightarrow: '\u219B',
+    		nrtri: '\u22EB',
+    		nrtrie: '\u22ED',
+    		nsc: '\u2281',
+    		nsccue: '\u22E1',
+    		nsce: '\u2AB0\u0338',
+    		Nscr: '\uD835\uDCA9',
+    		nscr: '\uD835\uDCC3',
+    		nshortmid: '\u2224',
+    		nshortparallel: '\u2226',
+    		nsim: '\u2241',
+    		nsime: '\u2244',
+    		nsimeq: '\u2244',
+    		nsmid: '\u2224',
+    		nspar: '\u2226',
+    		nsqsube: '\u22E2',
+    		nsqsupe: '\u22E3',
+    		nsub: '\u2284',
+    		nsubE: '\u2AC5\u0338',
+    		nsube: '\u2288',
+    		nsubset: '\u2282\u20D2',
+    		nsubseteq: '\u2288',
+    		nsubseteqq: '\u2AC5\u0338',
+    		nsucc: '\u2281',
+    		nsucceq: '\u2AB0\u0338',
+    		nsup: '\u2285',
+    		nsupE: '\u2AC6\u0338',
+    		nsupe: '\u2289',
+    		nsupset: '\u2283\u20D2',
+    		nsupseteq: '\u2289',
+    		nsupseteqq: '\u2AC6\u0338',
+    		ntgl: '\u2279',
+    		Ntilde: '\u00D1',
+    		ntilde: '\u00F1',
+    		ntlg: '\u2278',
+    		ntriangleleft: '\u22EA',
+    		ntrianglelefteq: '\u22EC',
+    		ntriangleright: '\u22EB',
+    		ntrianglerighteq: '\u22ED',
+    		Nu: '\u039D',
+    		nu: '\u03BD',
+    		num: '\u0023',
+    		numero: '\u2116',
+    		numsp: '\u2007',
+    		nvap: '\u224D\u20D2',
+    		nVDash: '\u22AF',
+    		nVdash: '\u22AE',
+    		nvDash: '\u22AD',
+    		nvdash: '\u22AC',
+    		nvge: '\u2265\u20D2',
+    		nvgt: '\u003E\u20D2',
+    		nvHarr: '\u2904',
+    		nvinfin: '\u29DE',
+    		nvlArr: '\u2902',
+    		nvle: '\u2264\u20D2',
+    		nvlt: '\u003C\u20D2',
+    		nvltrie: '\u22B4\u20D2',
+    		nvrArr: '\u2903',
+    		nvrtrie: '\u22B5\u20D2',
+    		nvsim: '\u223C\u20D2',
+    		nwarhk: '\u2923',
+    		nwArr: '\u21D6',
+    		nwarr: '\u2196',
+    		nwarrow: '\u2196',
+    		nwnear: '\u2927',
+    		Oacute: '\u00D3',
+    		oacute: '\u00F3',
+    		oast: '\u229B',
+    		ocir: '\u229A',
+    		Ocirc: '\u00D4',
+    		ocirc: '\u00F4',
+    		Ocy: '\u041E',
+    		ocy: '\u043E',
+    		odash: '\u229D',
+    		Odblac: '\u0150',
+    		odblac: '\u0151',
+    		odiv: '\u2A38',
+    		odot: '\u2299',
+    		odsold: '\u29BC',
+    		OElig: '\u0152',
+    		oelig: '\u0153',
+    		ofcir: '\u29BF',
+    		Ofr: '\uD835\uDD12',
+    		ofr: '\uD835\uDD2C',
+    		ogon: '\u02DB',
+    		Ograve: '\u00D2',
+    		ograve: '\u00F2',
+    		ogt: '\u29C1',
+    		ohbar: '\u29B5',
+    		ohm: '\u03A9',
+    		oint: '\u222E',
+    		olarr: '\u21BA',
+    		olcir: '\u29BE',
+    		olcross: '\u29BB',
+    		oline: '\u203E',
+    		olt: '\u29C0',
+    		Omacr: '\u014C',
+    		omacr: '\u014D',
+    		Omega: '\u03A9',
+    		omega: '\u03C9',
+    		Omicron: '\u039F',
+    		omicron: '\u03BF',
+    		omid: '\u29B6',
+    		ominus: '\u2296',
+    		Oopf: '\uD835\uDD46',
+    		oopf: '\uD835\uDD60',
+    		opar: '\u29B7',
+    		OpenCurlyDoubleQuote: '\u201C',
+    		OpenCurlyQuote: '\u2018',
+    		operp: '\u29B9',
+    		oplus: '\u2295',
+    		Or: '\u2A54',
+    		or: '\u2228',
+    		orarr: '\u21BB',
+    		ord: '\u2A5D',
+    		order: '\u2134',
+    		orderof: '\u2134',
+    		ordf: '\u00AA',
+    		ordm: '\u00BA',
+    		origof: '\u22B6',
+    		oror: '\u2A56',
+    		orslope: '\u2A57',
+    		orv: '\u2A5B',
+    		oS: '\u24C8',
+    		Oscr: '\uD835\uDCAA',
+    		oscr: '\u2134',
+    		Oslash: '\u00D8',
+    		oslash: '\u00F8',
+    		osol: '\u2298',
+    		Otilde: '\u00D5',
+    		otilde: '\u00F5',
+    		Otimes: '\u2A37',
+    		otimes: '\u2297',
+    		otimesas: '\u2A36',
+    		Ouml: '\u00D6',
+    		ouml: '\u00F6',
+    		ovbar: '\u233D',
+    		OverBar: '\u203E',
+    		OverBrace: '\u23DE',
+    		OverBracket: '\u23B4',
+    		OverParenthesis: '\u23DC',
+    		par: '\u2225',
+    		para: '\u00B6',
+    		parallel: '\u2225',
+    		parsim: '\u2AF3',
+    		parsl: '\u2AFD',
+    		part: '\u2202',
+    		PartialD: '\u2202',
+    		Pcy: '\u041F',
+    		pcy: '\u043F',
+    		percnt: '\u0025',
+    		period: '\u002E',
+    		permil: '\u2030',
+    		perp: '\u22A5',
+    		pertenk: '\u2031',
+    		Pfr: '\uD835\uDD13',
+    		pfr: '\uD835\uDD2D',
+    		Phi: '\u03A6',
+    		phi: '\u03C6',
+    		phiv: '\u03D5',
+    		phmmat: '\u2133',
+    		phone: '\u260E',
+    		Pi: '\u03A0',
+    		pi: '\u03C0',
+    		pitchfork: '\u22D4',
+    		piv: '\u03D6',
+    		planck: '\u210F',
+    		planckh: '\u210E',
+    		plankv: '\u210F',
+    		plus: '\u002B',
+    		plusacir: '\u2A23',
+    		plusb: '\u229E',
+    		pluscir: '\u2A22',
+    		plusdo: '\u2214',
+    		plusdu: '\u2A25',
+    		pluse: '\u2A72',
+    		PlusMinus: '\u00B1',
+    		plusmn: '\u00B1',
+    		plussim: '\u2A26',
+    		plustwo: '\u2A27',
+    		pm: '\u00B1',
+    		Poincareplane: '\u210C',
+    		pointint: '\u2A15',
+    		Popf: '\u2119',
+    		popf: '\uD835\uDD61',
+    		pound: '\u00A3',
+    		Pr: '\u2ABB',
+    		pr: '\u227A',
+    		prap: '\u2AB7',
+    		prcue: '\u227C',
+    		prE: '\u2AB3',
+    		pre: '\u2AAF',
+    		prec: '\u227A',
+    		precapprox: '\u2AB7',
+    		preccurlyeq: '\u227C',
+    		Precedes: '\u227A',
+    		PrecedesEqual: '\u2AAF',
+    		PrecedesSlantEqual: '\u227C',
+    		PrecedesTilde: '\u227E',
+    		preceq: '\u2AAF',
+    		precnapprox: '\u2AB9',
+    		precneqq: '\u2AB5',
+    		precnsim: '\u22E8',
+    		precsim: '\u227E',
+    		Prime: '\u2033',
+    		prime: '\u2032',
+    		primes: '\u2119',
+    		prnap: '\u2AB9',
+    		prnE: '\u2AB5',
+    		prnsim: '\u22E8',
+    		prod: '\u220F',
+    		Product: '\u220F',
+    		profalar: '\u232E',
+    		profline: '\u2312',
+    		profsurf: '\u2313',
+    		prop: '\u221D',
+    		Proportion: '\u2237',
+    		Proportional: '\u221D',
+    		propto: '\u221D',
+    		prsim: '\u227E',
+    		prurel: '\u22B0',
+    		Pscr: '\uD835\uDCAB',
+    		pscr: '\uD835\uDCC5',
+    		Psi: '\u03A8',
+    		psi: '\u03C8',
+    		puncsp: '\u2008',
+    		Qfr: '\uD835\uDD14',
+    		qfr: '\uD835\uDD2E',
+    		qint: '\u2A0C',
+    		Qopf: '\u211A',
+    		qopf: '\uD835\uDD62',
+    		qprime: '\u2057',
+    		Qscr: '\uD835\uDCAC',
+    		qscr: '\uD835\uDCC6',
+    		quaternions: '\u210D',
+    		quatint: '\u2A16',
+    		quest: '\u003F',
+    		questeq: '\u225F',
+    		QUOT: '\u0022',
+    		quot: '\u0022',
+    		rAarr: '\u21DB',
+    		race: '\u223D\u0331',
+    		Racute: '\u0154',
+    		racute: '\u0155',
+    		radic: '\u221A',
+    		raemptyv: '\u29B3',
+    		Rang: '\u27EB',
+    		rang: '\u27E9',
+    		rangd: '\u2992',
+    		range: '\u29A5',
+    		rangle: '\u27E9',
+    		raquo: '\u00BB',
+    		Rarr: '\u21A0',
+    		rArr: '\u21D2',
+    		rarr: '\u2192',
+    		rarrap: '\u2975',
+    		rarrb: '\u21E5',
+    		rarrbfs: '\u2920',
+    		rarrc: '\u2933',
+    		rarrfs: '\u291E',
+    		rarrhk: '\u21AA',
+    		rarrlp: '\u21AC',
+    		rarrpl: '\u2945',
+    		rarrsim: '\u2974',
+    		Rarrtl: '\u2916',
+    		rarrtl: '\u21A3',
+    		rarrw: '\u219D',
+    		rAtail: '\u291C',
+    		ratail: '\u291A',
+    		ratio: '\u2236',
+    		rationals: '\u211A',
+    		RBarr: '\u2910',
+    		rBarr: '\u290F',
+    		rbarr: '\u290D',
+    		rbbrk: '\u2773',
+    		rbrace: '\u007D',
+    		rbrack: '\u005D',
+    		rbrke: '\u298C',
+    		rbrksld: '\u298E',
+    		rbrkslu: '\u2990',
+    		Rcaron: '\u0158',
+    		rcaron: '\u0159',
+    		Rcedil: '\u0156',
+    		rcedil: '\u0157',
+    		rceil: '\u2309',
+    		rcub: '\u007D',
+    		Rcy: '\u0420',
+    		rcy: '\u0440',
+    		rdca: '\u2937',
+    		rdldhar: '\u2969',
+    		rdquo: '\u201D',
+    		rdquor: '\u201D',
+    		rdsh: '\u21B3',
+    		Re: '\u211C',
+    		real: '\u211C',
+    		realine: '\u211B',
+    		realpart: '\u211C',
+    		reals: '\u211D',
+    		rect: '\u25AD',
+    		REG: '\u00AE',
+    		reg: '\u00AE',
+    		ReverseElement: '\u220B',
+    		ReverseEquilibrium: '\u21CB',
+    		ReverseUpEquilibrium: '\u296F',
+    		rfisht: '\u297D',
+    		rfloor: '\u230B',
+    		Rfr: '\u211C',
+    		rfr: '\uD835\uDD2F',
+    		rHar: '\u2964',
+    		rhard: '\u21C1',
+    		rharu: '\u21C0',
+    		rharul: '\u296C',
+    		Rho: '\u03A1',
+    		rho: '\u03C1',
+    		rhov: '\u03F1',
+    		RightAngleBracket: '\u27E9',
+    		RightArrow: '\u2192',
+    		Rightarrow: '\u21D2',
+    		rightarrow: '\u2192',
+    		RightArrowBar: '\u21E5',
+    		RightArrowLeftArrow: '\u21C4',
+    		rightarrowtail: '\u21A3',
+    		RightCeiling: '\u2309',
+    		RightDoubleBracket: '\u27E7',
+    		RightDownTeeVector: '\u295D',
+    		RightDownVector: '\u21C2',
+    		RightDownVectorBar: '\u2955',
+    		RightFloor: '\u230B',
+    		rightharpoondown: '\u21C1',
+    		rightharpoonup: '\u21C0',
+    		rightleftarrows: '\u21C4',
+    		rightleftharpoons: '\u21CC',
+    		rightrightarrows: '\u21C9',
+    		rightsquigarrow: '\u219D',
+    		RightTee: '\u22A2',
+    		RightTeeArrow: '\u21A6',
+    		RightTeeVector: '\u295B',
+    		rightthreetimes: '\u22CC',
+    		RightTriangle: '\u22B3',
+    		RightTriangleBar: '\u29D0',
+    		RightTriangleEqual: '\u22B5',
+    		RightUpDownVector: '\u294F',
+    		RightUpTeeVector: '\u295C',
+    		RightUpVector: '\u21BE',
+    		RightUpVectorBar: '\u2954',
+    		RightVector: '\u21C0',
+    		RightVectorBar: '\u2953',
+    		ring: '\u02DA',
+    		risingdotseq: '\u2253',
+    		rlarr: '\u21C4',
+    		rlhar: '\u21CC',
+    		rlm: '\u200F',
+    		rmoust: '\u23B1',
+    		rmoustache: '\u23B1',
+    		rnmid: '\u2AEE',
+    		roang: '\u27ED',
+    		roarr: '\u21FE',
+    		robrk: '\u27E7',
+    		ropar: '\u2986',
+    		Ropf: '\u211D',
+    		ropf: '\uD835\uDD63',
+    		roplus: '\u2A2E',
+    		rotimes: '\u2A35',
+    		RoundImplies: '\u2970',
+    		rpar: '\u0029',
+    		rpargt: '\u2994',
+    		rppolint: '\u2A12',
+    		rrarr: '\u21C9',
+    		Rrightarrow: '\u21DB',
+    		rsaquo: '\u203A',
+    		Rscr: '\u211B',
+    		rscr: '\uD835\uDCC7',
+    		Rsh: '\u21B1',
+    		rsh: '\u21B1',
+    		rsqb: '\u005D',
+    		rsquo: '\u2019',
+    		rsquor: '\u2019',
+    		rthree: '\u22CC',
+    		rtimes: '\u22CA',
+    		rtri: '\u25B9',
+    		rtrie: '\u22B5',
+    		rtrif: '\u25B8',
+    		rtriltri: '\u29CE',
+    		RuleDelayed: '\u29F4',
+    		ruluhar: '\u2968',
+    		rx: '\u211E',
+    		Sacute: '\u015A',
+    		sacute: '\u015B',
+    		sbquo: '\u201A',
+    		Sc: '\u2ABC',
+    		sc: '\u227B',
+    		scap: '\u2AB8',
+    		Scaron: '\u0160',
+    		scaron: '\u0161',
+    		sccue: '\u227D',
+    		scE: '\u2AB4',
+    		sce: '\u2AB0',
+    		Scedil: '\u015E',
+    		scedil: '\u015F',
+    		Scirc: '\u015C',
+    		scirc: '\u015D',
+    		scnap: '\u2ABA',
+    		scnE: '\u2AB6',
+    		scnsim: '\u22E9',
+    		scpolint: '\u2A13',
+    		scsim: '\u227F',
+    		Scy: '\u0421',
+    		scy: '\u0441',
+    		sdot: '\u22C5',
+    		sdotb: '\u22A1',
+    		sdote: '\u2A66',
+    		searhk: '\u2925',
+    		seArr: '\u21D8',
+    		searr: '\u2198',
+    		searrow: '\u2198',
+    		sect: '\u00A7',
+    		semi: '\u003B',
+    		seswar: '\u2929',
+    		setminus: '\u2216',
+    		setmn: '\u2216',
+    		sext: '\u2736',
+    		Sfr: '\uD835\uDD16',
+    		sfr: '\uD835\uDD30',
+    		sfrown: '\u2322',
+    		sharp: '\u266F',
+    		SHCHcy: '\u0429',
+    		shchcy: '\u0449',
+    		SHcy: '\u0428',
+    		shcy: '\u0448',
+    		ShortDownArrow: '\u2193',
+    		ShortLeftArrow: '\u2190',
+    		shortmid: '\u2223',
+    		shortparallel: '\u2225',
+    		ShortRightArrow: '\u2192',
+    		ShortUpArrow: '\u2191',
+    		shy: '\u00AD',
+    		Sigma: '\u03A3',
+    		sigma: '\u03C3',
+    		sigmaf: '\u03C2',
+    		sigmav: '\u03C2',
+    		sim: '\u223C',
+    		simdot: '\u2A6A',
+    		sime: '\u2243',
+    		simeq: '\u2243',
+    		simg: '\u2A9E',
+    		simgE: '\u2AA0',
+    		siml: '\u2A9D',
+    		simlE: '\u2A9F',
+    		simne: '\u2246',
+    		simplus: '\u2A24',
+    		simrarr: '\u2972',
+    		slarr: '\u2190',
+    		SmallCircle: '\u2218',
+    		smallsetminus: '\u2216',
+    		smashp: '\u2A33',
+    		smeparsl: '\u29E4',
+    		smid: '\u2223',
+    		smile: '\u2323',
+    		smt: '\u2AAA',
+    		smte: '\u2AAC',
+    		smtes: '\u2AAC\uFE00',
+    		SOFTcy: '\u042C',
+    		softcy: '\u044C',
+    		sol: '\u002F',
+    		solb: '\u29C4',
+    		solbar: '\u233F',
+    		Sopf: '\uD835\uDD4A',
+    		sopf: '\uD835\uDD64',
+    		spades: '\u2660',
+    		spadesuit: '\u2660',
+    		spar: '\u2225',
+    		sqcap: '\u2293',
+    		sqcaps: '\u2293\uFE00',
+    		sqcup: '\u2294',
+    		sqcups: '\u2294\uFE00',
+    		Sqrt: '\u221A',
+    		sqsub: '\u228F',
+    		sqsube: '\u2291',
+    		sqsubset: '\u228F',
+    		sqsubseteq: '\u2291',
+    		sqsup: '\u2290',
+    		sqsupe: '\u2292',
+    		sqsupset: '\u2290',
+    		sqsupseteq: '\u2292',
+    		squ: '\u25A1',
+    		Square: '\u25A1',
+    		square: '\u25A1',
+    		SquareIntersection: '\u2293',
+    		SquareSubset: '\u228F',
+    		SquareSubsetEqual: '\u2291',
+    		SquareSuperset: '\u2290',
+    		SquareSupersetEqual: '\u2292',
+    		SquareUnion: '\u2294',
+    		squarf: '\u25AA',
+    		squf: '\u25AA',
+    		srarr: '\u2192',
+    		Sscr: '\uD835\uDCAE',
+    		sscr: '\uD835\uDCC8',
+    		ssetmn: '\u2216',
+    		ssmile: '\u2323',
+    		sstarf: '\u22C6',
+    		Star: '\u22C6',
+    		star: '\u2606',
+    		starf: '\u2605',
+    		straightepsilon: '\u03F5',
+    		straightphi: '\u03D5',
+    		strns: '\u00AF',
+    		Sub: '\u22D0',
+    		sub: '\u2282',
+    		subdot: '\u2ABD',
+    		subE: '\u2AC5',
+    		sube: '\u2286',
+    		subedot: '\u2AC3',
+    		submult: '\u2AC1',
+    		subnE: '\u2ACB',
+    		subne: '\u228A',
+    		subplus: '\u2ABF',
+    		subrarr: '\u2979',
+    		Subset: '\u22D0',
+    		subset: '\u2282',
+    		subseteq: '\u2286',
+    		subseteqq: '\u2AC5',
+    		SubsetEqual: '\u2286',
+    		subsetneq: '\u228A',
+    		subsetneqq: '\u2ACB',
+    		subsim: '\u2AC7',
+    		subsub: '\u2AD5',
+    		subsup: '\u2AD3',
+    		succ: '\u227B',
+    		succapprox: '\u2AB8',
+    		succcurlyeq: '\u227D',
+    		Succeeds: '\u227B',
+    		SucceedsEqual: '\u2AB0',
+    		SucceedsSlantEqual: '\u227D',
+    		SucceedsTilde: '\u227F',
+    		succeq: '\u2AB0',
+    		succnapprox: '\u2ABA',
+    		succneqq: '\u2AB6',
+    		succnsim: '\u22E9',
+    		succsim: '\u227F',
+    		SuchThat: '\u220B',
+    		Sum: '\u2211',
+    		sum: '\u2211',
+    		sung: '\u266A',
+    		Sup: '\u22D1',
+    		sup: '\u2283',
+    		sup1: '\u00B9',
+    		sup2: '\u00B2',
+    		sup3: '\u00B3',
+    		supdot: '\u2ABE',
+    		supdsub: '\u2AD8',
+    		supE: '\u2AC6',
+    		supe: '\u2287',
+    		supedot: '\u2AC4',
+    		Superset: '\u2283',
+    		SupersetEqual: '\u2287',
+    		suphsol: '\u27C9',
+    		suphsub: '\u2AD7',
+    		suplarr: '\u297B',
+    		supmult: '\u2AC2',
+    		supnE: '\u2ACC',
+    		supne: '\u228B',
+    		supplus: '\u2AC0',
+    		Supset: '\u22D1',
+    		supset: '\u2283',
+    		supseteq: '\u2287',
+    		supseteqq: '\u2AC6',
+    		supsetneq: '\u228B',
+    		supsetneqq: '\u2ACC',
+    		supsim: '\u2AC8',
+    		supsub: '\u2AD4',
+    		supsup: '\u2AD6',
+    		swarhk: '\u2926',
+    		swArr: '\u21D9',
+    		swarr: '\u2199',
+    		swarrow: '\u2199',
+    		swnwar: '\u292A',
+    		szlig: '\u00DF',
+    		Tab: '\u0009',
+    		target: '\u2316',
+    		Tau: '\u03A4',
+    		tau: '\u03C4',
+    		tbrk: '\u23B4',
+    		Tcaron: '\u0164',
+    		tcaron: '\u0165',
+    		Tcedil: '\u0162',
+    		tcedil: '\u0163',
+    		Tcy: '\u0422',
+    		tcy: '\u0442',
+    		tdot: '\u20DB',
+    		telrec: '\u2315',
+    		Tfr: '\uD835\uDD17',
+    		tfr: '\uD835\uDD31',
+    		there4: '\u2234',
+    		Therefore: '\u2234',
+    		therefore: '\u2234',
+    		Theta: '\u0398',
+    		theta: '\u03B8',
+    		thetasym: '\u03D1',
+    		thetav: '\u03D1',
+    		thickapprox: '\u2248',
+    		thicksim: '\u223C',
+    		ThickSpace: '\u205F\u200A',
+    		thinsp: '\u2009',
+    		ThinSpace: '\u2009',
+    		thkap: '\u2248',
+    		thksim: '\u223C',
+    		THORN: '\u00DE',
+    		thorn: '\u00FE',
+    		Tilde: '\u223C',
+    		tilde: '\u02DC',
+    		TildeEqual: '\u2243',
+    		TildeFullEqual: '\u2245',
+    		TildeTilde: '\u2248',
+    		times: '\u00D7',
+    		timesb: '\u22A0',
+    		timesbar: '\u2A31',
+    		timesd: '\u2A30',
+    		tint: '\u222D',
+    		toea: '\u2928',
+    		top: '\u22A4',
+    		topbot: '\u2336',
+    		topcir: '\u2AF1',
+    		Topf: '\uD835\uDD4B',
+    		topf: '\uD835\uDD65',
+    		topfork: '\u2ADA',
+    		tosa: '\u2929',
+    		tprime: '\u2034',
+    		TRADE: '\u2122',
+    		trade: '\u2122',
+    		triangle: '\u25B5',
+    		triangledown: '\u25BF',
+    		triangleleft: '\u25C3',
+    		trianglelefteq: '\u22B4',
+    		triangleq: '\u225C',
+    		triangleright: '\u25B9',
+    		trianglerighteq: '\u22B5',
+    		tridot: '\u25EC',
+    		trie: '\u225C',
+    		triminus: '\u2A3A',
+    		TripleDot: '\u20DB',
+    		triplus: '\u2A39',
+    		trisb: '\u29CD',
+    		tritime: '\u2A3B',
+    		trpezium: '\u23E2',
+    		Tscr: '\uD835\uDCAF',
+    		tscr: '\uD835\uDCC9',
+    		TScy: '\u0426',
+    		tscy: '\u0446',
+    		TSHcy: '\u040B',
+    		tshcy: '\u045B',
+    		Tstrok: '\u0166',
+    		tstrok: '\u0167',
+    		twixt: '\u226C',
+    		twoheadleftarrow: '\u219E',
+    		twoheadrightarrow: '\u21A0',
+    		Uacute: '\u00DA',
+    		uacute: '\u00FA',
+    		Uarr: '\u219F',
+    		uArr: '\u21D1',
+    		uarr: '\u2191',
+    		Uarrocir: '\u2949',
+    		Ubrcy: '\u040E',
+    		ubrcy: '\u045E',
+    		Ubreve: '\u016C',
+    		ubreve: '\u016D',
+    		Ucirc: '\u00DB',
+    		ucirc: '\u00FB',
+    		Ucy: '\u0423',
+    		ucy: '\u0443',
+    		udarr: '\u21C5',
+    		Udblac: '\u0170',
+    		udblac: '\u0171',
+    		udhar: '\u296E',
+    		ufisht: '\u297E',
+    		Ufr: '\uD835\uDD18',
+    		ufr: '\uD835\uDD32',
+    		Ugrave: '\u00D9',
+    		ugrave: '\u00F9',
+    		uHar: '\u2963',
+    		uharl: '\u21BF',
+    		uharr: '\u21BE',
+    		uhblk: '\u2580',
+    		ulcorn: '\u231C',
+    		ulcorner: '\u231C',
+    		ulcrop: '\u230F',
+    		ultri: '\u25F8',
+    		Umacr: '\u016A',
+    		umacr: '\u016B',
+    		uml: '\u00A8',
+    		UnderBar: '\u005F',
+    		UnderBrace: '\u23DF',
+    		UnderBracket: '\u23B5',
+    		UnderParenthesis: '\u23DD',
+    		Union: '\u22C3',
+    		UnionPlus: '\u228E',
+    		Uogon: '\u0172',
+    		uogon: '\u0173',
+    		Uopf: '\uD835\uDD4C',
+    		uopf: '\uD835\uDD66',
+    		UpArrow: '\u2191',
+    		Uparrow: '\u21D1',
+    		uparrow: '\u2191',
+    		UpArrowBar: '\u2912',
+    		UpArrowDownArrow: '\u21C5',
+    		UpDownArrow: '\u2195',
+    		Updownarrow: '\u21D5',
+    		updownarrow: '\u2195',
+    		UpEquilibrium: '\u296E',
+    		upharpoonleft: '\u21BF',
+    		upharpoonright: '\u21BE',
+    		uplus: '\u228E',
+    		UpperLeftArrow: '\u2196',
+    		UpperRightArrow: '\u2197',
+    		Upsi: '\u03D2',
+    		upsi: '\u03C5',
+    		upsih: '\u03D2',
+    		Upsilon: '\u03A5',
+    		upsilon: '\u03C5',
+    		UpTee: '\u22A5',
+    		UpTeeArrow: '\u21A5',
+    		upuparrows: '\u21C8',
+    		urcorn: '\u231D',
+    		urcorner: '\u231D',
+    		urcrop: '\u230E',
+    		Uring: '\u016E',
+    		uring: '\u016F',
+    		urtri: '\u25F9',
+    		Uscr: '\uD835\uDCB0',
+    		uscr: '\uD835\uDCCA',
+    		utdot: '\u22F0',
+    		Utilde: '\u0168',
+    		utilde: '\u0169',
+    		utri: '\u25B5',
+    		utrif: '\u25B4',
+    		uuarr: '\u21C8',
+    		Uuml: '\u00DC',
+    		uuml: '\u00FC',
+    		uwangle: '\u29A7',
+    		vangrt: '\u299C',
+    		varepsilon: '\u03F5',
+    		varkappa: '\u03F0',
+    		varnothing: '\u2205',
+    		varphi: '\u03D5',
+    		varpi: '\u03D6',
+    		varpropto: '\u221D',
+    		vArr: '\u21D5',
+    		varr: '\u2195',
+    		varrho: '\u03F1',
+    		varsigma: '\u03C2',
+    		varsubsetneq: '\u228A\uFE00',
+    		varsubsetneqq: '\u2ACB\uFE00',
+    		varsupsetneq: '\u228B\uFE00',
+    		varsupsetneqq: '\u2ACC\uFE00',
+    		vartheta: '\u03D1',
+    		vartriangleleft: '\u22B2',
+    		vartriangleright: '\u22B3',
+    		Vbar: '\u2AEB',
+    		vBar: '\u2AE8',
+    		vBarv: '\u2AE9',
+    		Vcy: '\u0412',
+    		vcy: '\u0432',
+    		VDash: '\u22AB',
+    		Vdash: '\u22A9',
+    		vDash: '\u22A8',
+    		vdash: '\u22A2',
+    		Vdashl: '\u2AE6',
+    		Vee: '\u22C1',
+    		vee: '\u2228',
+    		veebar: '\u22BB',
+    		veeeq: '\u225A',
+    		vellip: '\u22EE',
+    		Verbar: '\u2016',
+    		verbar: '\u007C',
+    		Vert: '\u2016',
+    		vert: '\u007C',
+    		VerticalBar: '\u2223',
+    		VerticalLine: '\u007C',
+    		VerticalSeparator: '\u2758',
+    		VerticalTilde: '\u2240',
+    		VeryThinSpace: '\u200A',
+    		Vfr: '\uD835\uDD19',
+    		vfr: '\uD835\uDD33',
+    		vltri: '\u22B2',
+    		vnsub: '\u2282\u20D2',
+    		vnsup: '\u2283\u20D2',
+    		Vopf: '\uD835\uDD4D',
+    		vopf: '\uD835\uDD67',
+    		vprop: '\u221D',
+    		vrtri: '\u22B3',
+    		Vscr: '\uD835\uDCB1',
+    		vscr: '\uD835\uDCCB',
+    		vsubnE: '\u2ACB\uFE00',
+    		vsubne: '\u228A\uFE00',
+    		vsupnE: '\u2ACC\uFE00',
+    		vsupne: '\u228B\uFE00',
+    		Vvdash: '\u22AA',
+    		vzigzag: '\u299A',
+    		Wcirc: '\u0174',
+    		wcirc: '\u0175',
+    		wedbar: '\u2A5F',
+    		Wedge: '\u22C0',
+    		wedge: '\u2227',
+    		wedgeq: '\u2259',
+    		weierp: '\u2118',
+    		Wfr: '\uD835\uDD1A',
+    		wfr: '\uD835\uDD34',
+    		Wopf: '\uD835\uDD4E',
+    		wopf: '\uD835\uDD68',
+    		wp: '\u2118',
+    		wr: '\u2240',
+    		wreath: '\u2240',
+    		Wscr: '\uD835\uDCB2',
+    		wscr: '\uD835\uDCCC',
+    		xcap: '\u22C2',
+    		xcirc: '\u25EF',
+    		xcup: '\u22C3',
+    		xdtri: '\u25BD',
+    		Xfr: '\uD835\uDD1B',
+    		xfr: '\uD835\uDD35',
+    		xhArr: '\u27FA',
+    		xharr: '\u27F7',
+    		Xi: '\u039E',
+    		xi: '\u03BE',
+    		xlArr: '\u27F8',
+    		xlarr: '\u27F5',
+    		xmap: '\u27FC',
+    		xnis: '\u22FB',
+    		xodot: '\u2A00',
+    		Xopf: '\uD835\uDD4F',
+    		xopf: '\uD835\uDD69',
+    		xoplus: '\u2A01',
+    		xotime: '\u2A02',
+    		xrArr: '\u27F9',
+    		xrarr: '\u27F6',
+    		Xscr: '\uD835\uDCB3',
+    		xscr: '\uD835\uDCCD',
+    		xsqcup: '\u2A06',
+    		xuplus: '\u2A04',
+    		xutri: '\u25B3',
+    		xvee: '\u22C1',
+    		xwedge: '\u22C0',
+    		Yacute: '\u00DD',
+    		yacute: '\u00FD',
+    		YAcy: '\u042F',
+    		yacy: '\u044F',
+    		Ycirc: '\u0176',
+    		ycirc: '\u0177',
+    		Ycy: '\u042B',
+    		ycy: '\u044B',
+    		yen: '\u00A5',
+    		Yfr: '\uD835\uDD1C',
+    		yfr: '\uD835\uDD36',
+    		YIcy: '\u0407',
+    		yicy: '\u0457',
+    		Yopf: '\uD835\uDD50',
+    		yopf: '\uD835\uDD6A',
+    		Yscr: '\uD835\uDCB4',
+    		yscr: '\uD835\uDCCE',
+    		YUcy: '\u042E',
+    		yucy: '\u044E',
+    		Yuml: '\u0178',
+    		yuml: '\u00FF',
+    		Zacute: '\u0179',
+    		zacute: '\u017A',
+    		Zcaron: '\u017D',
+    		zcaron: '\u017E',
+    		Zcy: '\u0417',
+    		zcy: '\u0437',
+    		Zdot: '\u017B',
+    		zdot: '\u017C',
+    		zeetrf: '\u2128',
+    		ZeroWidthSpace: '\u200B',
+    		Zeta: '\u0396',
+    		zeta: '\u03B6',
+    		Zfr: '\u2128',
+    		zfr: '\uD835\uDD37',
+    		ZHcy: '\u0416',
+    		zhcy: '\u0436',
+    		zigrarr: '\u21DD',
+    		Zopf: '\u2124',
+    		zopf: '\uD835\uDD6B',
+    		Zscr: '\uD835\uDCB5',
+    		zscr: '\uD835\uDCCF',
+    		zwj: '\u200D',
+    		zwnj: '\u200C',
+    	});
+
+    	/**
+    	 * @deprecated use `HTML_ENTITIES` instead
+    	 * @see HTML_ENTITIES
+    	 */
+    	exports.entityMap = exports.HTML_ENTITIES; 
+    } (entities$2));
+
+    var entities$1 = /*@__PURE__*/getDefaultExportFromCjs(entities$2);
+
+    var sax$1 = {};
+
+    var NAMESPACE$1 = conventions$2.NAMESPACE;
+
+    //[4]   	NameStartChar	   ::=   	":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6] | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
+    //[4a]   	NameChar	   ::=   	NameStartChar | "-" | "." | [0-9] | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
+    //[5]   	Name	   ::=   	NameStartChar (NameChar)*
+    var nameStartChar = /[A-Z_a-z\xC0-\xD6\xD8-\xF6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]/;//\u10000-\uEFFFF
+    var nameChar = new RegExp("[\\-\\.0-9"+nameStartChar.source.slice(1,-1)+"\\u00B7\\u0300-\\u036F\\u203F-\\u2040]");
+    var tagNamePattern = new RegExp('^'+nameStartChar.source+nameChar.source+'*(?:\:'+nameStartChar.source+nameChar.source+'*)?$');
+    //var tagNamePattern = /^[a-zA-Z_][\w\-\.]*(?:\:[a-zA-Z_][\w\-\.]*)?$/
+    //var handlers = 'resolveEntity,getExternalSubset,characters,endDocument,endElement,endPrefixMapping,ignorableWhitespace,processingInstruction,setDocumentLocator,skippedEntity,startDocument,startElement,startPrefixMapping,notationDecl,unparsedEntityDecl,error,fatalError,warning,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,comment,endCDATA,endDTD,endEntity,startCDATA,startDTD,startEntity'.split(',')
+
+    //S_TAG,	S_ATTR,	S_EQ,	S_ATTR_NOQUOT_VALUE
+    //S_ATTR_SPACE,	S_ATTR_END,	S_TAG_SPACE, S_TAG_CLOSE
+    var S_TAG = 0;//tag name offerring
+    var S_ATTR = 1;//attr name offerring
+    var S_ATTR_SPACE=2;//attr name end and space offer
+    var S_EQ = 3;//=space?
+    var S_ATTR_NOQUOT_VALUE = 4;//attr value(no quot value only)
+    var S_ATTR_END = 5;//attr value end and no space(quot end)
+    var S_TAG_SPACE = 6;//(attr value end || tag end ) && (space offer)
+    var S_TAG_CLOSE = 7;//closed el<el />
+
+    /**
+     * Creates an error that will not be caught by XMLReader aka the SAX parser.
+     *
+     * @param {string} message
+     * @param {any?} locator Optional, can provide details about the location in the source
+     * @constructor
+     */
+    function ParseError$1(message, locator) {
+    	this.message = message;
+    	this.locator = locator;
+    	if(Error.captureStackTrace) Error.captureStackTrace(this, ParseError$1);
+    }
+    ParseError$1.prototype = new Error();
+    ParseError$1.prototype.name = ParseError$1.name;
+
+    function XMLReader$1(){
+
+    }
+
+    XMLReader$1.prototype = {
+    	parse:function(source,defaultNSMap,entityMap){
+    		var domBuilder = this.domBuilder;
+    		domBuilder.startDocument();
+    		_copy(defaultNSMap ,defaultNSMap = {});
+    		parse$2(source,defaultNSMap,entityMap,
+    				domBuilder,this.errorHandler);
+    		domBuilder.endDocument();
+    	}
+    };
+    function parse$2(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
+    	function fixedFromCharCode(code) {
+    		// String.prototype.fromCharCode does not supports
+    		// > 2 bytes unicode chars directly
+    		if (code > 0xffff) {
+    			code -= 0x10000;
+    			var surrogate1 = 0xd800 + (code >> 10)
+    				, surrogate2 = 0xdc00 + (code & 0x3ff);
+
+    			return String.fromCharCode(surrogate1, surrogate2);
+    		} else {
+    			return String.fromCharCode(code);
+    		}
+    	}
+    	function entityReplacer(a){
+    		var k = a.slice(1,-1);
+    		if (Object.hasOwnProperty.call(entityMap, k)) {
+    			return entityMap[k];
+    		}else if(k.charAt(0) === '#'){
+    			return fixedFromCharCode(parseInt(k.substr(1).replace('x','0x')))
+    		}else {
+    			errorHandler.error('entity not found:'+a);
+    			return a;
+    		}
+    	}
+    	function appendText(end){//has some bugs
+    		if(end>start){
+    			var xt = source.substring(start,end).replace(/&#?\w+;/g,entityReplacer);
+    			locator&&position(start);
+    			domBuilder.characters(xt,0,end-start);
+    			start = end;
+    		}
+    	}
+    	function position(p,m){
+    		while(p>=lineEnd && (m = linePattern.exec(source))){
+    			lineStart = m.index;
+    			lineEnd = lineStart + m[0].length;
+    			locator.lineNumber++;
+    			//console.log('line++:',locator,startPos,endPos)
+    		}
+    		locator.columnNumber = p-lineStart+1;
+    	}
+    	var lineStart = 0;
+    	var lineEnd = 0;
+    	var linePattern = /.*(?:\r\n?|\n)|.*$/g;
+    	var locator = domBuilder.locator;
+
+    	var parseStack = [{currentNSMap:defaultNSMapCopy}];
+    	var closeMap = {};
+    	var start = 0;
+    	while(true){
+    		try{
+    			var tagStart = source.indexOf('<',start);
+    			if(tagStart<0){
+    				if(!source.substr(start).match(/^\s*$/)){
+    					var doc = domBuilder.doc;
+    	    			var text = doc.createTextNode(source.substr(start));
+    	    			doc.appendChild(text);
+    	    			domBuilder.currentElement = text;
+    				}
+    				return;
+    			}
+    			if(tagStart>start){
+    				appendText(tagStart);
+    			}
+    			switch(source.charAt(tagStart+1)){
+    			case '/':
+    				var end = source.indexOf('>',tagStart+3);
+    				var tagName = source.substring(tagStart + 2, end).replace(/[ \t\n\r]+$/g, '');
+    				var config = parseStack.pop();
+    				if(end<0){
+
+    	        		tagName = source.substring(tagStart+2).replace(/[\s<].*/,'');
+    	        		errorHandler.error("end tag name: "+tagName+' is not complete:'+config.tagName);
+    	        		end = tagStart+1+tagName.length;
+    	        	}else if(tagName.match(/\s</)){
+    	        		tagName = tagName.replace(/[\s<].*/,'');
+    	        		errorHandler.error("end tag name: "+tagName+' maybe not complete');
+    	        		end = tagStart+1+tagName.length;
+    				}
+    				var localNSMap = config.localNSMap;
+    				var endMatch = config.tagName == tagName;
+    				var endIgnoreCaseMach = endMatch || config.tagName&&config.tagName.toLowerCase() == tagName.toLowerCase();
+    		        if(endIgnoreCaseMach){
+    		        	domBuilder.endElement(config.uri,config.localName,tagName);
+    					if(localNSMap){
+    						for (var prefix in localNSMap) {
+    							if (Object.prototype.hasOwnProperty.call(localNSMap, prefix)) {
+    								domBuilder.endPrefixMapping(prefix);
+    							}
+    						}
+    					}
+    					if(!endMatch){
+    		            	errorHandler.fatalError("end tag name: "+tagName+' is not match the current start tagName:'+config.tagName ); // No known test case
+    					}
+    		        }else {
+    		        	parseStack.push(config);
+    		        }
+
+    				end++;
+    				break;
+    				// end elment
+    			case '?':// <?...?>
+    				locator&&position(tagStart);
+    				end = parseInstruction(source,tagStart,domBuilder);
+    				break;
+    			case '!':// <!doctype,<![CDATA,<!--
+    				locator&&position(tagStart);
+    				end = parseDCC(source,tagStart,domBuilder,errorHandler);
+    				break;
+    			default:
+    				locator&&position(tagStart);
+    				var el = new ElementAttributes();
+    				var currentNSMap = parseStack[parseStack.length-1].currentNSMap;
+    				//elStartEnd
+    				var end = parseElementStartPart(source,tagStart,el,currentNSMap,entityReplacer,errorHandler);
+    				var len = el.length;
+
+
+    				if(!el.closed && fixSelfClosed(source,end,el.tagName,closeMap)){
+    					el.closed = true;
+    					if(!entityMap.nbsp){
+    						errorHandler.warning('unclosed xml attribute');
+    					}
+    				}
+    				if(locator && len){
+    					var locator2 = copyLocator(locator,{});
+    					//try{//attribute position fixed
+    					for(var i = 0;i<len;i++){
+    						var a = el[i];
+    						position(a.offset);
+    						a.locator = copyLocator(locator,{});
+    					}
+    					domBuilder.locator = locator2;
+    					if(appendElement$1(el,domBuilder,currentNSMap)){
+    						parseStack.push(el);
+    					}
+    					domBuilder.locator = locator;
+    				}else {
+    					if(appendElement$1(el,domBuilder,currentNSMap)){
+    						parseStack.push(el);
+    					}
+    				}
+
+    				if (NAMESPACE$1.isHTML(el.uri) && !el.closed) {
+    					end = parseHtmlSpecialContent(source,end,el.tagName,entityReplacer,domBuilder);
+    				} else {
+    					end++;
+    				}
+    			}
+    		}catch(e){
+    			if (e instanceof ParseError$1) {
+    				throw e;
+    			}
+    			errorHandler.error('element parse error: '+e);
+    			end = -1;
+    		}
+    		if(end>start){
+    			start = end;
+    		}else {
+    			//TODO: 这里有可能sax回退，有位置错误风险
+    			appendText(Math.max(tagStart,start)+1);
+    		}
+    	}
+    }
+    function copyLocator(f,t){
+    	t.lineNumber = f.lineNumber;
+    	t.columnNumber = f.columnNumber;
+    	return t;
+    }
+
+    /**
+     * @see #appendElement(source,elStartEnd,el,selfClosed,entityReplacer,domBuilder,parseStack);
+     * @return end of the elementStartPart(end of elementEndPart for selfClosed el)
+     */
+    function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,errorHandler){
+
+    	/**
+    	 * @param {string} qname
+    	 * @param {string} value
+    	 * @param {number} startIndex
+    	 */
+    	function addAttribute(qname, value, startIndex) {
+    		if (el.attributeNames.hasOwnProperty(qname)) {
+    			errorHandler.fatalError('Attribute ' + qname + ' redefined');
+    		}
+    		el.addValue(
+    			qname,
+    			// @see https://www.w3.org/TR/xml/#AVNormalize
+    			// since the xmldom sax parser does not "interpret" DTD the following is not implemented:
+    			// - recursive replacement of (DTD) entity references
+    			// - trimming and collapsing multiple spaces into a single one for attributes that are not of type CDATA
+    			value.replace(/[\t\n\r]/g, ' ').replace(/&#?\w+;/g, entityReplacer),
+    			startIndex
+    		);
+    	}
+    	var attrName;
+    	var value;
+    	var p = ++start;
+    	var s = S_TAG;//status
+    	while(true){
+    		var c = source.charAt(p);
+    		switch(c){
+    		case '=':
+    			if(s === S_ATTR){//attrName
+    				attrName = source.slice(start,p);
+    				s = S_EQ;
+    			}else if(s === S_ATTR_SPACE){
+    				s = S_EQ;
+    			}else {
+    				//fatalError: equal must after attrName or space after attrName
+    				throw new Error('attribute equal must after attrName'); // No known test case
+    			}
+    			break;
+    		case '\'':
+    		case '"':
+    			if(s === S_EQ || s === S_ATTR //|| s == S_ATTR_SPACE
+    				){//equal
+    				if(s === S_ATTR){
+    					errorHandler.warning('attribute value must after "="');
+    					attrName = source.slice(start,p);
+    				}
+    				start = p+1;
+    				p = source.indexOf(c,start);
+    				if(p>0){
+    					value = source.slice(start, p);
+    					addAttribute(attrName, value, start-1);
+    					s = S_ATTR_END;
+    				}else {
+    					//fatalError: no end quot match
+    					throw new Error('attribute value no end \''+c+'\' match');
+    				}
+    			}else if(s == S_ATTR_NOQUOT_VALUE){
+    				value = source.slice(start, p);
+    				addAttribute(attrName, value, start);
+    				errorHandler.warning('attribute "'+attrName+'" missed start quot('+c+')!!');
+    				start = p+1;
+    				s = S_ATTR_END;
+    			}else {
+    				//fatalError: no equal before
+    				throw new Error('attribute value must after "="'); // No known test case
+    			}
+    			break;
+    		case '/':
+    			switch(s){
+    			case S_TAG:
+    				el.setTagName(source.slice(start,p));
+    			case S_ATTR_END:
+    			case S_TAG_SPACE:
+    			case S_TAG_CLOSE:
+    				s =S_TAG_CLOSE;
+    				el.closed = true;
+    			case S_ATTR_NOQUOT_VALUE:
+    			case S_ATTR:
+    				break;
+    				case S_ATTR_SPACE:
+    					el.closed = true;
+    				break;
+    			//case S_EQ:
+    			default:
+    				throw new Error("attribute invalid close char('/')") // No known test case
+    			}
+    			break;
+    		case ''://end document
+    			errorHandler.error('unexpected end of input');
+    			if(s == S_TAG){
+    				el.setTagName(source.slice(start,p));
+    			}
+    			return p;
+    		case '>':
+    			switch(s){
+    			case S_TAG:
+    				el.setTagName(source.slice(start,p));
+    			case S_ATTR_END:
+    			case S_TAG_SPACE:
+    			case S_TAG_CLOSE:
+    				break;//normal
+    			case S_ATTR_NOQUOT_VALUE://Compatible state
+    			case S_ATTR:
+    				value = source.slice(start,p);
+    				if(value.slice(-1) === '/'){
+    					el.closed  = true;
+    					value = value.slice(0,-1);
+    				}
+    			case S_ATTR_SPACE:
+    				if(s === S_ATTR_SPACE){
+    					value = attrName;
+    				}
+    				if(s == S_ATTR_NOQUOT_VALUE){
+    					errorHandler.warning('attribute "'+value+'" missed quot(")!');
+    					addAttribute(attrName, value, start);
+    				}else {
+    					if(!NAMESPACE$1.isHTML(currentNSMap['']) || !value.match(/^(?:disabled|checked|selected)$/i)){
+    						errorHandler.warning('attribute "'+value+'" missed value!! "'+value+'" instead!!');
+    					}
+    					addAttribute(value, value, start);
+    				}
+    				break;
+    			case S_EQ:
+    				throw new Error('attribute value missed!!');
+    			}
+    //			console.log(tagName,tagNamePattern,tagNamePattern.test(tagName))
+    			return p;
+    		/*xml space '\x20' | #x9 | #xD | #xA; */
+    		case '\u0080':
+    			c = ' ';
+    		default:
+    			if(c<= ' '){//space
+    				switch(s){
+    				case S_TAG:
+    					el.setTagName(source.slice(start,p));//tagName
+    					s = S_TAG_SPACE;
+    					break;
+    				case S_ATTR:
+    					attrName = source.slice(start,p);
+    					s = S_ATTR_SPACE;
+    					break;
+    				case S_ATTR_NOQUOT_VALUE:
+    					var value = source.slice(start, p);
+    					errorHandler.warning('attribute "'+value+'" missed quot(")!!');
+    					addAttribute(attrName, value, start);
+    				case S_ATTR_END:
+    					s = S_TAG_SPACE;
+    					break;
+    				//case S_TAG_SPACE:
+    				//case S_EQ:
+    				//case S_ATTR_SPACE:
+    				//	void();break;
+    				//case S_TAG_CLOSE:
+    					//ignore warning
+    				}
+    			}else {//not space
+    //S_TAG,	S_ATTR,	S_EQ,	S_ATTR_NOQUOT_VALUE
+    //S_ATTR_SPACE,	S_ATTR_END,	S_TAG_SPACE, S_TAG_CLOSE
+    				switch(s){
+    				//case S_TAG:void();break;
+    				//case S_ATTR:void();break;
+    				//case S_ATTR_NOQUOT_VALUE:void();break;
+    				case S_ATTR_SPACE:
+    					var tagName =  el.tagName;
+    					if (!NAMESPACE$1.isHTML(currentNSMap['']) || !attrName.match(/^(?:disabled|checked|selected)$/i)) {
+    						errorHandler.warning('attribute "'+attrName+'" missed value!! "'+attrName+'" instead2!!');
+    					}
+    					addAttribute(attrName, attrName, start);
+    					start = p;
+    					s = S_ATTR;
+    					break;
+    				case S_ATTR_END:
+    					errorHandler.warning('attribute space is required"'+attrName+'"!!');
+    				case S_TAG_SPACE:
+    					s = S_ATTR;
+    					start = p;
+    					break;
+    				case S_EQ:
+    					s = S_ATTR_NOQUOT_VALUE;
+    					start = p;
+    					break;
+    				case S_TAG_CLOSE:
+    					throw new Error("elements closed character '/' and '>' must be connected to");
+    				}
+    			}
+    		}//end outer switch
+    		//console.log('p++',p)
+    		p++;
+    	}
+    }
+    /**
+     * @return true if has new namespace define
+     */
+    function appendElement$1(el,domBuilder,currentNSMap){
+    	var tagName = el.tagName;
+    	var localNSMap = null;
+    	//var currentNSMap = parseStack[parseStack.length-1].currentNSMap;
+    	var i = el.length;
+    	while(i--){
+    		var a = el[i];
+    		var qName = a.qName;
+    		var value = a.value;
+    		var nsp = qName.indexOf(':');
+    		if(nsp>0){
+    			var prefix = a.prefix = qName.slice(0,nsp);
+    			var localName = qName.slice(nsp+1);
+    			var nsPrefix = prefix === 'xmlns' && localName;
+    		}else {
+    			localName = qName;
+    			prefix = null;
+    			nsPrefix = qName === 'xmlns' && '';
+    		}
+    		//can not set prefix,because prefix !== ''
+    		a.localName = localName ;
+    		//prefix == null for no ns prefix attribute
+    		if(nsPrefix !== false){//hack!!
+    			if(localNSMap == null){
+    				localNSMap = {};
+    				//console.log(currentNSMap,0)
+    				_copy(currentNSMap,currentNSMap={});
+    				//console.log(currentNSMap,1)
+    			}
+    			currentNSMap[nsPrefix] = localNSMap[nsPrefix] = value;
+    			a.uri = NAMESPACE$1.XMLNS;
+    			domBuilder.startPrefixMapping(nsPrefix, value);
+    		}
+    	}
+    	var i = el.length;
+    	while(i--){
+    		a = el[i];
+    		var prefix = a.prefix;
+    		if(prefix){//no prefix attribute has no namespace
+    			if(prefix === 'xml'){
+    				a.uri = NAMESPACE$1.XML;
+    			}if(prefix !== 'xmlns'){
+    				a.uri = currentNSMap[prefix || ''];
+
+    				//{console.log('###'+a.qName,domBuilder.locator.systemId+'',currentNSMap,a.uri)}
+    			}
+    		}
+    	}
+    	var nsp = tagName.indexOf(':');
+    	if(nsp>0){
+    		prefix = el.prefix = tagName.slice(0,nsp);
+    		localName = el.localName = tagName.slice(nsp+1);
+    	}else {
+    		prefix = null;//important!!
+    		localName = el.localName = tagName;
+    	}
+    	//no prefix element has default namespace
+    	var ns = el.uri = currentNSMap[prefix || ''];
+    	domBuilder.startElement(ns,localName,tagName,el);
+    	//endPrefixMapping and startPrefixMapping have not any help for dom builder
+    	//localNSMap = null
+    	if(el.closed){
+    		domBuilder.endElement(ns,localName,tagName);
+    		if(localNSMap){
+    			for (prefix in localNSMap) {
+    				if (Object.prototype.hasOwnProperty.call(localNSMap, prefix)) {
+    					domBuilder.endPrefixMapping(prefix);
+    				}
+    			}
+    		}
+    	}else {
+    		el.currentNSMap = currentNSMap;
+    		el.localNSMap = localNSMap;
+    		//parseStack.push(el);
+    		return true;
+    	}
+    }
+    function parseHtmlSpecialContent(source,elStartEnd,tagName,entityReplacer,domBuilder){
+    	if(/^(?:script|textarea)$/i.test(tagName)){
+    		var elEndStart =  source.indexOf('</'+tagName+'>',elStartEnd);
+    		var text = source.substring(elStartEnd+1,elEndStart);
+    		if(/[&<]/.test(text)){
+    			if(/^script$/i.test(tagName)){
+    				//if(!/\]\]>/.test(text)){
+    					//lexHandler.startCDATA();
+    					domBuilder.characters(text,0,text.length);
+    					//lexHandler.endCDATA();
+    					return elEndStart;
+    				//}
+    			}//}else{//text area
+    				text = text.replace(/&#?\w+;/g,entityReplacer);
+    				domBuilder.characters(text,0,text.length);
+    				return elEndStart;
+    			//}
+
+    		}
+    	}
+    	return elStartEnd+1;
+    }
+    function fixSelfClosed(source,elStartEnd,tagName,closeMap){
+    	//if(tagName in closeMap){
+    	var pos = closeMap[tagName];
+    	if(pos == null){
+    		//console.log(tagName)
+    		pos =  source.lastIndexOf('</'+tagName+'>');
+    		if(pos<elStartEnd){//忘记闭合
+    			pos = source.lastIndexOf('</'+tagName);
+    		}
+    		closeMap[tagName] =pos;
+    	}
+    	return pos<elStartEnd;
+    	//}
+    }
+
+    function _copy (source, target) {
+    	for (var n in source) {
+    		if (Object.prototype.hasOwnProperty.call(source, n)) {
+    			target[n] = source[n];
+    		}
+    	}
+    }
+
+    function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
+    	var next= source.charAt(start+2);
+    	switch(next){
+    	case '-':
+    		if(source.charAt(start + 3) === '-'){
+    			var end = source.indexOf('-->',start+4);
+    			//append comment source.substring(4,end)//<!--
+    			if(end>start){
+    				domBuilder.comment(source,start+4,end-start-4);
+    				return end+3;
+    			}else {
+    				errorHandler.error("Unclosed comment");
+    				return -1;
+    			}
+    		}else {
+    			//error
+    			return -1;
+    		}
+    	default:
+    		if(source.substr(start+3,6) == 'CDATA['){
+    			var end = source.indexOf(']]>',start+9);
+    			domBuilder.startCDATA();
+    			domBuilder.characters(source,start+9,end-start-9);
+    			domBuilder.endCDATA();
+    			return end+3;
+    		}
+    		//<!DOCTYPE
+    		//startDTD(java.lang.String name, java.lang.String publicId, java.lang.String systemId)
+    		var matchs = split(source,start);
+    		var len = matchs.length;
+    		if(len>1 && /!doctype/i.test(matchs[0][0])){
+    			var name = matchs[1][0];
+    			var pubid = false;
+    			var sysid = false;
+    			if(len>3){
+    				if(/^public$/i.test(matchs[2][0])){
+    					pubid = matchs[3][0];
+    					sysid = len>4 && matchs[4][0];
+    				}else if(/^system$/i.test(matchs[2][0])){
+    					sysid = matchs[3][0];
+    				}
+    			}
+    			var lastMatch = matchs[len-1];
+    			domBuilder.startDTD(name, pubid, sysid);
+    			domBuilder.endDTD();
+
+    			return lastMatch.index+lastMatch[0].length
+    		}
+    	}
+    	return -1;
+    }
+
+
+
+    function parseInstruction(source,start,domBuilder){
+    	var end = source.indexOf('?>',start);
+    	if(end){
+    		var match = source.substring(start,end).match(/^<\?(\S*)\s*([\s\S]*?)\s*$/);
+    		if(match){
+    			var len = match[0].length;
+    			domBuilder.processingInstruction(match[1], match[2]) ;
+    			return end+2;
+    		}else {//error
+    			return -1;
+    		}
+    	}
+    	return -1;
+    }
+
+    function ElementAttributes(){
+    	this.attributeNames = {};
+    }
+    ElementAttributes.prototype = {
+    	setTagName:function(tagName){
+    		if(!tagNamePattern.test(tagName)){
+    			throw new Error('invalid tagName:'+tagName)
+    		}
+    		this.tagName = tagName;
+    	},
+    	addValue:function(qName, value, offset) {
+    		if(!tagNamePattern.test(qName)){
+    			throw new Error('invalid attribute:'+qName)
+    		}
+    		this.attributeNames[qName] = this.length;
+    		this[this.length++] = {qName:qName,value:value,offset:offset};
+    	},
+    	length:0,
+    	getLocalName:function(i){return this[i].localName},
+    	getLocator:function(i){return this[i].locator},
+    	getQName:function(i){return this[i].qName},
+    	getURI:function(i){return this[i].uri},
+    	getValue:function(i){return this[i].value}
+    //	,getIndex:function(uri, localName)){
+    //		if(localName){
+    //
+    //		}else{
+    //			var qName = uri
+    //		}
+    //	},
+    //	getValue:function(){return this.getValue(this.getIndex.apply(this,arguments))},
+    //	getType:function(uri,localName){}
+    //	getType:function(i){},
+    };
+
+
+
+    function split(source,start){
+    	var match;
+    	var buf = [];
+    	var reg = /'[^']+'|"[^"]+"|[^\s<>\/=]+=?|(\/?\s*>|<)/g;
+    	reg.lastIndex = start;
+    	reg.exec(source);//skip <
+    	while(match = reg.exec(source)){
+    		buf.push(match);
+    		if(match[1])return buf;
+    	}
+    }
+
+    var XMLReader_1 = sax$1.XMLReader = XMLReader$1;
+    var ParseError_1 = sax$1.ParseError = ParseError$1;
+
+    var conventions = conventions$2;
+    var dom$1 = dom$2;
+    var entities = entities$2;
+    var sax = sax$1;
+
+    var DOMImplementation$1 = dom$1.DOMImplementation;
+
+    var NAMESPACE = conventions.NAMESPACE;
+
+    var ParseError = sax.ParseError;
+    var XMLReader = sax.XMLReader;
+
+    /**
+     * Normalizes line ending according to https://www.w3.org/TR/xml11/#sec-line-ends:
+     *
+     * > XML parsed entities are often stored in computer files which,
+     * > for editing convenience, are organized into lines.
+     * > These lines are typically separated by some combination
+     * > of the characters CARRIAGE RETURN (#xD) and LINE FEED (#xA).
+     * >
+     * > To simplify the tasks of applications, the XML processor must behave
+     * > as if it normalized all line breaks in external parsed entities (including the document entity)
+     * > on input, before parsing, by translating all of the following to a single #xA character:
+     * >
+     * > 1. the two-character sequence #xD #xA
+     * > 2. the two-character sequence #xD #x85
+     * > 3. the single character #x85
+     * > 4. the single character #x2028
+     * > 5. any #xD character that is not immediately followed by #xA or #x85.
+     *
+     * @param {string} input
+     * @returns {string}
+     */
+    function normalizeLineEndings(input) {
+    	return input
+    		.replace(/\r[\n\u0085]/g, '\n')
+    		.replace(/[\r\u0085\u2028]/g, '\n')
+    }
+
+    /**
+     * @typedef Locator
+     * @property {number} [columnNumber]
+     * @property {number} [lineNumber]
+     */
+
+    /**
+     * @typedef DOMParserOptions
+     * @property {DOMHandler} [domBuilder]
+     * @property {Function} [errorHandler]
+     * @property {(string) => string} [normalizeLineEndings] used to replace line endings before parsing
+     * 						defaults to `normalizeLineEndings`
+     * @property {Locator} [locator]
+     * @property {Record<string, string>} [xmlns]
+     *
+     * @see normalizeLineEndings
+     */
+
+    /**
+     * The DOMParser interface provides the ability to parse XML or HTML source code
+     * from a string into a DOM `Document`.
+     *
+     * _xmldom is different from the spec in that it allows an `options` parameter,
+     * to override the default behavior._
+     *
+     * @param {DOMParserOptions} [options]
+     * @constructor
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser
+     * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#dom-parsing-and-serialization
+     */
+    function DOMParser$2(options){
+    	this.options = options ||{locator:{}};
+    }
+
+    DOMParser$2.prototype.parseFromString = function(source,mimeType){
+    	var options = this.options;
+    	var sax =  new XMLReader();
+    	var domBuilder = options.domBuilder || new DOMHandler();//contentHandler and LexicalHandler
+    	var errorHandler = options.errorHandler;
+    	var locator = options.locator;
+    	var defaultNSMap = options.xmlns||{};
+    	var isHTML = /\/x?html?$/.test(mimeType);//mimeType.toLowerCase().indexOf('html') > -1;
+      	var entityMap = isHTML ? entities.HTML_ENTITIES : entities.XML_ENTITIES;
+    	if(locator){
+    		domBuilder.setDocumentLocator(locator);
+    	}
+
+    	sax.errorHandler = buildErrorHandler(errorHandler,domBuilder,locator);
+    	sax.domBuilder = options.domBuilder || domBuilder;
+    	if(isHTML){
+    		defaultNSMap[''] = NAMESPACE.HTML;
+    	}
+    	defaultNSMap.xml = defaultNSMap.xml || NAMESPACE.XML;
+    	var normalize = options.normalizeLineEndings || normalizeLineEndings;
+    	if (source && typeof source === 'string') {
+    		sax.parse(
+    			normalize(source),
+    			defaultNSMap,
+    			entityMap
+    		);
+    	} else {
+    		sax.errorHandler.error('invalid doc source');
+    	}
+    	return domBuilder.doc;
+    };
+    function buildErrorHandler(errorImpl,domBuilder,locator){
+    	if(!errorImpl){
+    		if(domBuilder instanceof DOMHandler){
+    			return domBuilder;
+    		}
+    		errorImpl = domBuilder ;
+    	}
+    	var errorHandler = {};
+    	var isCallback = errorImpl instanceof Function;
+    	locator = locator||{};
+    	function build(key){
+    		var fn = errorImpl[key];
+    		if(!fn && isCallback){
+    			fn = errorImpl.length == 2?function(msg){errorImpl(key,msg);}:errorImpl;
+    		}
+    		errorHandler[key] = fn && function(msg){
+    			fn('[xmldom '+key+']\t'+msg+_locator(locator));
+    		}||function(){};
+    	}
+    	build('warning');
+    	build('error');
+    	build('fatalError');
+    	return errorHandler;
+    }
+
+    //console.log('#\n\n\n\n\n\n\n####')
+    /**
+     * +ContentHandler+ErrorHandler
+     * +LexicalHandler+EntityResolver2
+     * -DeclHandler-DTDHandler
+     *
+     * DefaultHandler:EntityResolver, DTDHandler, ContentHandler, ErrorHandler
+     * DefaultHandler2:DefaultHandler,LexicalHandler, DeclHandler, EntityResolver2
+     * @link http://www.saxproject.org/apidoc/org/xml/sax/helpers/DefaultHandler.html
+     */
+    function DOMHandler() {
+        this.cdata = false;
+    }
+    function position(locator,node){
+    	node.lineNumber = locator.lineNumber;
+    	node.columnNumber = locator.columnNumber;
+    }
+    /**
+     * @see org.xml.sax.ContentHandler#startDocument
+     * @link http://www.saxproject.org/apidoc/org/xml/sax/ContentHandler.html
+     */
+    DOMHandler.prototype = {
+    	startDocument : function() {
+        	this.doc = new DOMImplementation$1().createDocument(null, null, null);
+        	if (this.locator) {
+            	this.doc.documentURI = this.locator.systemId;
+        	}
+    	},
+    	startElement:function(namespaceURI, localName, qName, attrs) {
+    		var doc = this.doc;
+    	    var el = doc.createElementNS(namespaceURI, qName||localName);
+    	    var len = attrs.length;
+    	    appendElement(this, el);
+    	    this.currentElement = el;
+
+    		this.locator && position(this.locator,el);
+    	    for (var i = 0 ; i < len; i++) {
+    	        var namespaceURI = attrs.getURI(i);
+    	        var value = attrs.getValue(i);
+    	        var qName = attrs.getQName(i);
+    			var attr = doc.createAttributeNS(namespaceURI, qName);
+    			this.locator &&position(attrs.getLocator(i),attr);
+    			attr.value = attr.nodeValue = value;
+    			el.setAttributeNode(attr);
+    	    }
+    	},
+    	endElement:function(namespaceURI, localName, qName) {
+    		var current = this.currentElement;
+    		var tagName = current.tagName;
+    		this.currentElement = current.parentNode;
+    	},
+    	startPrefixMapping:function(prefix, uri) {
+    	},
+    	endPrefixMapping:function(prefix) {
+    	},
+    	processingInstruction:function(target, data) {
+    	    var ins = this.doc.createProcessingInstruction(target, data);
+    	    this.locator && position(this.locator,ins);
+    	    appendElement(this, ins);
+    	},
+    	ignorableWhitespace:function(ch, start, length) {
+    	},
+    	characters:function(chars, start, length) {
+    		chars = _toString.apply(this,arguments);
+    		//console.log(chars)
+    		if(chars){
+    			if (this.cdata) {
+    				var charNode = this.doc.createCDATASection(chars);
+    			} else {
+    				var charNode = this.doc.createTextNode(chars);
+    			}
+    			if(this.currentElement){
+    				this.currentElement.appendChild(charNode);
+    			}else if(/^\s*$/.test(chars)){
+    				this.doc.appendChild(charNode);
+    				//process xml
+    			}
+    			this.locator && position(this.locator,charNode);
+    		}
+    	},
+    	skippedEntity:function(name) {
+    	},
+    	endDocument:function() {
+    		this.doc.normalize();
+    	},
+    	setDocumentLocator:function (locator) {
+    	    if(this.locator = locator){// && !('lineNumber' in locator)){
+    	    	locator.lineNumber = 0;
+    	    }
+    	},
+    	//LexicalHandler
+    	comment:function(chars, start, length) {
+    		chars = _toString.apply(this,arguments);
+    	    var comm = this.doc.createComment(chars);
+    	    this.locator && position(this.locator,comm);
+    	    appendElement(this, comm);
+    	},
+
+    	startCDATA:function() {
+    	    //used in characters() methods
+    	    this.cdata = true;
+    	},
+    	endCDATA:function() {
+    	    this.cdata = false;
+    	},
+
+    	startDTD:function(name, publicId, systemId) {
+    		var impl = this.doc.implementation;
+    	    if (impl && impl.createDocumentType) {
+    	        var dt = impl.createDocumentType(name, publicId, systemId);
+    	        this.locator && position(this.locator,dt);
+    	        appendElement(this, dt);
+    					this.doc.doctype = dt;
+    	    }
+    	},
+    	/**
+    	 * @see org.xml.sax.ErrorHandler
+    	 * @link http://www.saxproject.org/apidoc/org/xml/sax/ErrorHandler.html
+    	 */
+    	warning:function(error) {
+    		console.warn('[xmldom warning]\t'+error,_locator(this.locator));
+    	},
+    	error:function(error) {
+    		console.error('[xmldom error]\t'+error,_locator(this.locator));
+    	},
+    	fatalError:function(error) {
+    		throw new ParseError(error, this.locator);
+    	}
+    };
+    function _locator(l){
+    	if(l){
+    		return '\n@'+(l.systemId ||'')+'#[line:'+l.lineNumber+',col:'+l.columnNumber+']'
+    	}
+    }
+    function _toString(chars,start,length){
+    	if(typeof chars == 'string'){
+    		return chars.substr(start,length)
+    	}else {//java sax connect width xmldom on rhino(what about: "? && !(chars instanceof String)")
+    		if(chars.length >= start+length || start){
+    			return new java.lang.String(chars,start,length)+'';
+    		}
+    		return chars;
+    	}
+    }
+
+    /*
+     * @link http://www.saxproject.org/apidoc/org/xml/sax/ext/LexicalHandler.html
+     * used method of org.xml.sax.ext.LexicalHandler:
+     *  #comment(chars, start, length)
+     *  #startCDATA()
+     *  #endCDATA()
+     *  #startDTD(name, publicId, systemId)
+     *
+     *
+     * IGNORED method of org.xml.sax.ext.LexicalHandler:
+     *  #endDTD()
+     *  #startEntity(name)
+     *  #endEntity(name)
+     *
+     *
+     * @link http://www.saxproject.org/apidoc/org/xml/sax/ext/DeclHandler.html
+     * IGNORED method of org.xml.sax.ext.DeclHandler
+     * 	#attributeDecl(eName, aName, type, mode, value)
+     *  #elementDecl(name, model)
+     *  #externalEntityDecl(name, publicId, systemId)
+     *  #internalEntityDecl(name, value)
+     * @link http://www.saxproject.org/apidoc/org/xml/sax/ext/EntityResolver2.html
+     * IGNORED method of org.xml.sax.EntityResolver2
+     *  #resolveEntity(String name,String publicId,String baseURI,String systemId)
+     *  #resolveEntity(publicId, systemId)
+     *  #getExternalSubset(name, baseURI)
+     * @link http://www.saxproject.org/apidoc/org/xml/sax/DTDHandler.html
+     * IGNORED method of org.xml.sax.DTDHandler
+     *  #notationDecl(name, publicId, systemId) {};
+     *  #unparsedEntityDecl(name, publicId, systemId, notationName) {};
+     */
+    "endDTD,startEntity,endEntity,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,resolveEntity,getExternalSubset,notationDecl,unparsedEntityDecl".replace(/\w+/g,function(key){
+    	DOMHandler.prototype[key] = function(){return null};
+    });
+
+    /* Private static helpers treated below as private instance methods, so don't need to add these to the public API; we might use a Relator to also get rid of non-standard public properties */
+    function appendElement (hander,node) {
+        if (!hander.currentElement) {
+            hander.doc.appendChild(node);
+        } else {
+            hander.currentElement.appendChild(node);
+        }
+    }//appendChild and setAttributeNS are preformance key
+
+    var __DOMHandler = domParser.__DOMHandler = DOMHandler;
+    var normalizeLineEndings_1 = domParser.normalizeLineEndings = normalizeLineEndings;
+    var DOMParser_1 = domParser.DOMParser = DOMParser$2;
+
+    var dom = dom$2;
+    var DOMImplementation = lib.DOMImplementation = dom.DOMImplementation;
+    var XMLSerializer$1 = lib.XMLSerializer = dom.XMLSerializer;
+    var DOMParser$1 = lib.DOMParser = domParser.DOMParser;
+
+    "use strict";
+    const WebWorkerAdapter = {
+      createCanvas: (width, height) => new OffscreenCanvas(width != null ? width : 0, height != null ? height : 0),
+      getCanvasRenderingContext2D: () => OffscreenCanvasRenderingContext2D,
+      getWebGLRenderingContext: () => WebGLRenderingContext,
+      getNavigator: () => navigator,
+      getBaseUrl: () => globalThis.location.href,
+      getFontFaceSet: () => globalThis.fonts,
+      fetch: (url, options) => fetch(url, options),
+      parseXML: (xml) => {
+        const parser = new DOMParser$1();
+        return parser.parseFromString(xml, "text/xml");
+      }
+    };
+
+    "use strict";
+    var __defProp$V = Object.defineProperty;
     var __defProps$i = Object.defineProperties;
     var __getOwnPropDescs$i = Object.getOwnPropertyDescriptors;
-    var __getOwnPropSymbols$W = Object.getOwnPropertySymbols;
-    var __hasOwnProp$W = Object.prototype.hasOwnProperty;
-    var __propIsEnum$W = Object.prototype.propertyIsEnumerable;
-    var __defNormalProp$W = (obj, key, value) => key in obj ? __defProp$W(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-    var __spreadValues$W = (a, b) => {
+    var __getOwnPropSymbols$V = Object.getOwnPropertySymbols;
+    var __hasOwnProp$V = Object.prototype.hasOwnProperty;
+    var __propIsEnum$V = Object.prototype.propertyIsEnumerable;
+    var __defNormalProp$V = (obj, key, value) => key in obj ? __defProp$V(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    var __spreadValues$V = (a, b) => {
       for (var prop in b || (b = {}))
-        if (__hasOwnProp$W.call(b, prop))
-          __defNormalProp$W(a, prop, b[prop]);
-      if (__getOwnPropSymbols$W)
-        for (var prop of __getOwnPropSymbols$W(b)) {
-          if (__propIsEnum$W.call(b, prop))
-            __defNormalProp$W(a, prop, b[prop]);
+        if (__hasOwnProp$V.call(b, prop))
+          __defNormalProp$V(a, prop, b[prop]);
+      if (__getOwnPropSymbols$V)
+        for (var prop of __getOwnPropSymbols$V(b)) {
+          if (__propIsEnum$V.call(b, prop))
+            __defNormalProp$V(a, prop, b[prop]);
         }
       return a;
     };
@@ -56,10 +5370,10 @@ var PIXI = (function (exports) {
           throw new Error("Extension class must have an extension object");
         }
         const metadata = typeof ext.extension !== "object" ? { type: ext.extension } : ext.extension;
-        ext = __spreadProps$i(__spreadValues$W({}, metadata), { ref: ext });
+        ext = __spreadProps$i(__spreadValues$V({}, metadata), { ref: ext });
       }
       if (typeof ext === "object") {
-        ext = __spreadValues$W({}, ext);
+        ext = __spreadValues$V({}, ext);
       } else {
         throw new Error("Invalid extension type");
       }
@@ -210,44 +5524,1707 @@ var PIXI = (function (exports) {
       }
     };
 
-    var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+    "use strict";
+    class ResizePlugin {
+      /**
+       * Initialize the plugin with scope of application instance
+       * @static
+       * @private
+       * @param {object} [options] - See application options
+       */
+      static init(options) {
+        Object.defineProperty(
+          this,
+          "resizeTo",
+          /**
+           * The HTML element or window to automatically resize the
+           * renderer's view element to match width and height.
+           * @member {Window|HTMLElement}
+           * @name resizeTo
+           * @memberof app.Application#
+           */
+          {
+            set(dom) {
+              globalThis.removeEventListener("resize", this.queueResize);
+              this._resizeTo = dom;
+              if (dom) {
+                globalThis.addEventListener("resize", this.queueResize);
+                this.resize();
+              }
+            },
+            get() {
+              return this._resizeTo;
+            }
+          }
+        );
+        this.queueResize = () => {
+          if (!this._resizeTo) {
+            return;
+          }
+          this._cancelResize();
+          this._resizeId = requestAnimationFrame(() => this.resize());
+        };
+        this._cancelResize = () => {
+          if (this._resizeId) {
+            cancelAnimationFrame(this._resizeId);
+            this._resizeId = null;
+          }
+        };
+        this.resize = () => {
+          if (!this._resizeTo) {
+            return;
+          }
+          this._cancelResize();
+          let width;
+          let height;
+          if (this._resizeTo === globalThis.window) {
+            width = globalThis.innerWidth;
+            height = globalThis.innerHeight;
+          } else {
+            const { clientWidth, clientHeight } = this._resizeTo;
+            width = clientWidth;
+            height = clientHeight;
+          }
+          this.renderer.resize(width, height);
+          this.render();
+        };
+        this._resizeId = null;
+        this._resizeTo = null;
+        this.resizeTo = options.resizeTo || null;
+      }
+      /**
+       * Clean up the ticker, scoped to application
+       * @static
+       * @private
+       */
+      static destroy() {
+        globalThis.removeEventListener("resize", this.queueResize);
+        this._cancelResize();
+        this._cancelResize = null;
+        this.queueResize = null;
+        this.resizeTo = null;
+        this.resize = null;
+      }
+    }
+    /** @ignore */
+    ResizePlugin.extension = ExtensionType.Application;
 
-    function getDefaultExportFromCjs (x) {
-    	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+    "use strict";
+    var UPDATE_PRIORITY = /* @__PURE__ */ ((UPDATE_PRIORITY2) => {
+      UPDATE_PRIORITY2[UPDATE_PRIORITY2["INTERACTION"] = 50] = "INTERACTION";
+      UPDATE_PRIORITY2[UPDATE_PRIORITY2["HIGH"] = 25] = "HIGH";
+      UPDATE_PRIORITY2[UPDATE_PRIORITY2["NORMAL"] = 0] = "NORMAL";
+      UPDATE_PRIORITY2[UPDATE_PRIORITY2["LOW"] = -25] = "LOW";
+      UPDATE_PRIORITY2[UPDATE_PRIORITY2["UTILITY"] = -50] = "UTILITY";
+      return UPDATE_PRIORITY2;
+    })(UPDATE_PRIORITY || {});
+
+    "use strict";
+    class TickerListener {
+      /**
+       * Constructor
+       * @private
+       * @param fn - The listener function to be added for one update
+       * @param context - The listener context
+       * @param priority - The priority for emitting
+       * @param once - If the handler should fire once
+       */
+      constructor(fn, context = null, priority = 0, once = false) {
+        /** The next item in chain. */
+        this.next = null;
+        /** The previous item in chain. */
+        this.previous = null;
+        /** `true` if this listener has been destroyed already. */
+        this._destroyed = false;
+        this._fn = fn;
+        this._context = context;
+        this.priority = priority;
+        this._once = once;
+      }
+      /**
+       * Simple compare function to figure out if a function and context match.
+       * @param fn - The listener function to be added for one update
+       * @param context - The listener context
+       * @returns `true` if the listener match the arguments
+       */
+      match(fn, context = null) {
+        return this._fn === fn && this._context === context;
+      }
+      /**
+       * Emit by calling the current function.
+       * @param ticker - The ticker emitting.
+       * @returns Next ticker
+       */
+      emit(ticker) {
+        if (this._fn) {
+          if (this._context) {
+            this._fn.call(this._context, ticker);
+          } else {
+            this._fn(ticker);
+          }
+        }
+        const redirect = this.next;
+        if (this._once) {
+          this.destroy(true);
+        }
+        if (this._destroyed) {
+          this.next = null;
+        }
+        return redirect;
+      }
+      /**
+       * Connect to the list.
+       * @param previous - Input node, previous listener
+       */
+      connect(previous) {
+        this.previous = previous;
+        if (previous.next) {
+          previous.next.previous = this;
+        }
+        this.next = previous.next;
+        previous.next = this;
+      }
+      /**
+       * Destroy and don't use after this.
+       * @param hard - `true` to remove the `next` reference, this
+       *        is considered a hard destroy. Soft destroy maintains the next reference.
+       * @returns The listener to redirect while emitting or removing.
+       */
+      destroy(hard = false) {
+        this._destroyed = true;
+        this._fn = null;
+        this._context = null;
+        if (this.previous) {
+          this.previous.next = this.next;
+        }
+        if (this.next) {
+          this.next.previous = this.previous;
+        }
+        const redirect = this.next;
+        this.next = hard ? null : redirect;
+        this.previous = null;
+        return redirect;
+      }
     }
 
-    function getDefaultExportFromNamespaceIfPresent (n) {
-    	return n && Object.prototype.hasOwnProperty.call(n, 'default') ? n['default'] : n;
+    "use strict";
+    const _Ticker = class _Ticker {
+      constructor() {
+        /**
+         * Whether or not this ticker should invoke the method
+         * {@link ticker.Ticker#start|start} automatically when a listener is added.
+         */
+        this.autoStart = false;
+        /**
+         * Scalar time value from last frame to this frame.
+         * This value is capped by setting {@link ticker.Ticker#minFPS|minFPS}
+         * and is scaled with {@link ticker.Ticker#speed|speed}.
+         * **Note:** The cap may be exceeded by scaling.
+         */
+        this.deltaTime = 1;
+        /**
+         * The last time {@link ticker.Ticker#update|update} was invoked.
+         * This value is also reset internally outside of invoking
+         * update, but only when a new animation frame is requested.
+         * If the platform supports DOMHighResTimeStamp,
+         * this value will have a precision of 1 µs.
+         */
+        this.lastTime = -1;
+        /**
+         * Factor of current {@link ticker.Ticker#deltaTime|deltaTime}.
+         * @example
+         * // Scales ticker.deltaTime to what would be
+         * // the equivalent of approximately 120 FPS
+         * ticker.speed = 2;
+         */
+        this.speed = 1;
+        /**
+         * Whether or not this ticker has been started.
+         * `true` if {@link ticker.Ticker#start|start} has been called.
+         * `false` if {@link ticker.Ticker#stop|Stop} has been called.
+         * While `false`, this value may change to `true` in the
+         * event of {@link ticker.Ticker#autoStart|autoStart} being `true`
+         * and a listener is added.
+         */
+        this.started = false;
+        /** Internal current frame request ID */
+        this._requestId = null;
+        /**
+         * Internal value managed by minFPS property setter and getter.
+         * This is the maximum allowed milliseconds between updates.
+         */
+        this._maxElapsedMS = 100;
+        /**
+         * Internal value managed by minFPS property setter and getter.
+         * This is the minimum allowed milliseconds between updates.
+         */
+        this._minElapsedMS = 0;
+        /** If enabled, deleting is disabled.*/
+        this._protected = false;
+        /** The last time keyframe was executed. Maintains a relatively fixed interval with the previous value. */
+        this._lastFrame = -1;
+        this._head = new TickerListener(null, null, Infinity);
+        this.deltaMS = 1 / _Ticker.targetFPMS;
+        this.elapsedMS = 1 / _Ticker.targetFPMS;
+        this._tick = (time) => {
+          this._requestId = null;
+          if (this.started) {
+            this.update(time);
+            if (this.started && this._requestId === null && this._head.next) {
+              this._requestId = requestAnimationFrame(this._tick);
+            }
+          }
+        };
+      }
+      /**
+       * Conditionally requests a new animation frame.
+       * If a frame has not already been requested, and if the internal
+       * emitter has listeners, a new frame is requested.
+       * @private
+       */
+      _requestIfNeeded() {
+        if (this._requestId === null && this._head.next) {
+          this.lastTime = performance.now();
+          this._lastFrame = this.lastTime;
+          this._requestId = requestAnimationFrame(this._tick);
+        }
+      }
+      /**
+       * Conditionally cancels a pending animation frame.
+       * @private
+       */
+      _cancelIfNeeded() {
+        if (this._requestId !== null) {
+          cancelAnimationFrame(this._requestId);
+          this._requestId = null;
+        }
+      }
+      /**
+       * Conditionally requests a new animation frame.
+       * If the ticker has been started it checks if a frame has not already
+       * been requested, and if the internal emitter has listeners. If these
+       * conditions are met, a new frame is requested. If the ticker has not
+       * been started, but autoStart is `true`, then the ticker starts now,
+       * and continues with the previous conditions to request a new frame.
+       * @private
+       */
+      _startIfPossible() {
+        if (this.started) {
+          this._requestIfNeeded();
+        } else if (this.autoStart) {
+          this.start();
+        }
+      }
+      /**
+       * Register a handler for tick events. Calls continuously unless
+       * it is removed or the ticker is stopped.
+       * @param fn - The listener function to be added for updates
+       * @param context - The listener context
+       * @param {number} [priority=UPDATE_PRIORITY.NORMAL] - The priority for emitting
+       * @returns This instance of a ticker
+       */
+      add(fn, context, priority = UPDATE_PRIORITY.NORMAL) {
+        return this._addListener(new TickerListener(fn, context, priority));
+      }
+      /**
+       * Add a handler for the tick event which is only execute once.
+       * @param fn - The listener function to be added for one update
+       * @param context - The listener context
+       * @param {number} [priority=UPDATE_PRIORITY.NORMAL] - The priority for emitting
+       * @returns This instance of a ticker
+       */
+      addOnce(fn, context, priority = UPDATE_PRIORITY.NORMAL) {
+        return this._addListener(new TickerListener(fn, context, priority, true));
+      }
+      /**
+       * Internally adds the event handler so that it can be sorted by priority.
+       * Priority allows certain handler (user, AnimatedSprite, Interaction) to be run
+       * before the rendering.
+       * @private
+       * @param listener - Current listener being added.
+       * @returns This instance of a ticker
+       */
+      _addListener(listener) {
+        let current = this._head.next;
+        let previous = this._head;
+        if (!current) {
+          listener.connect(previous);
+        } else {
+          while (current) {
+            if (listener.priority > current.priority) {
+              listener.connect(previous);
+              break;
+            }
+            previous = current;
+            current = current.next;
+          }
+          if (!listener.previous) {
+            listener.connect(previous);
+          }
+        }
+        this._startIfPossible();
+        return this;
+      }
+      /**
+       * Removes any handlers matching the function and context parameters.
+       * If no handlers are left after removing, then it cancels the animation frame.
+       * @param fn - The listener function to be removed
+       * @param context - The listener context to be removed
+       * @returns This instance of a ticker
+       */
+      remove(fn, context) {
+        let listener = this._head.next;
+        while (listener) {
+          if (listener.match(fn, context)) {
+            listener = listener.destroy();
+          } else {
+            listener = listener.next;
+          }
+        }
+        if (!this._head.next) {
+          this._cancelIfNeeded();
+        }
+        return this;
+      }
+      /**
+       * The number of listeners on this ticker, calculated by walking through linked list
+       * @readonly
+       * @member {number}
+       */
+      get count() {
+        if (!this._head) {
+          return 0;
+        }
+        let count = 0;
+        let current = this._head;
+        while (current = current.next) {
+          count++;
+        }
+        return count;
+      }
+      /** Starts the ticker. If the ticker has listeners a new animation frame is requested at this point. */
+      start() {
+        if (!this.started) {
+          this.started = true;
+          this._requestIfNeeded();
+        }
+      }
+      /** Stops the ticker. If the ticker has requested an animation frame it is canceled at this point. */
+      stop() {
+        if (this.started) {
+          this.started = false;
+          this._cancelIfNeeded();
+        }
+      }
+      /** Destroy the ticker and don't use after this. Calling this method removes all references to internal events. */
+      destroy() {
+        if (!this._protected) {
+          this.stop();
+          let listener = this._head.next;
+          while (listener) {
+            listener = listener.destroy(true);
+          }
+          this._head.destroy();
+          this._head = null;
+        }
+      }
+      /**
+       * Triggers an update. An update entails setting the
+       * current {@link ticker.Ticker#elapsedMS|elapsedMS},
+       * the current {@link ticker.Ticker#deltaTime|deltaTime},
+       * invoking all listeners with current deltaTime,
+       * and then finally setting {@link ticker.Ticker#lastTime|lastTime}
+       * with the value of currentTime that was provided.
+       * This method will be called automatically by animation
+       * frame callbacks if the ticker instance has been started
+       * and listeners are added.
+       * @param {number} [currentTime=performance.now()] - the current time of execution
+       */
+      update(currentTime = performance.now()) {
+        let elapsedMS;
+        if (currentTime > this.lastTime) {
+          elapsedMS = this.elapsedMS = currentTime - this.lastTime;
+          if (elapsedMS > this._maxElapsedMS) {
+            elapsedMS = this._maxElapsedMS;
+          }
+          elapsedMS *= this.speed;
+          if (this._minElapsedMS) {
+            const delta = currentTime - this._lastFrame | 0;
+            if (delta < this._minElapsedMS) {
+              return;
+            }
+            this._lastFrame = currentTime - delta % this._minElapsedMS;
+          }
+          this.deltaMS = elapsedMS;
+          this.deltaTime = this.deltaMS * _Ticker.targetFPMS;
+          const head = this._head;
+          let listener = head.next;
+          while (listener) {
+            listener = listener.emit(this);
+          }
+          if (!head.next) {
+            this._cancelIfNeeded();
+          }
+        } else {
+          this.deltaTime = this.deltaMS = this.elapsedMS = 0;
+        }
+        this.lastTime = currentTime;
+      }
+      /**
+       * The frames per second at which this ticker is running.
+       * The default is approximately 60 in most modern browsers.
+       * **Note:** This does not factor in the value of
+       * {@link ticker.Ticker#speed|speed}, which is specific
+       * to scaling {@link ticker.Ticker#deltaTime|deltaTime}.
+       * @member {number}
+       * @readonly
+       */
+      get FPS() {
+        return 1e3 / this.elapsedMS;
+      }
+      /**
+       * Manages the maximum amount of milliseconds allowed to
+       * elapse between invoking {@link ticker.Ticker#update|update}.
+       * This value is used to cap {@link ticker.Ticker#deltaTime|deltaTime},
+       * but does not effect the measured value of {@link ticker.Ticker#FPS|FPS}.
+       * When setting this property it is clamped to a value between
+       * `0` and `Ticker.targetFPMS * 1000`.
+       * @member {number}
+       * @default 10
+       */
+      get minFPS() {
+        return 1e3 / this._maxElapsedMS;
+      }
+      set minFPS(fps) {
+        const minFPS = Math.min(this.maxFPS, fps);
+        const minFPMS = Math.min(Math.max(0, minFPS) / 1e3, _Ticker.targetFPMS);
+        this._maxElapsedMS = 1 / minFPMS;
+      }
+      /**
+       * Manages the minimum amount of milliseconds required to
+       * elapse between invoking {@link ticker.Ticker#update|update}.
+       * This will effect the measured value of {@link ticker.Ticker#FPS|FPS}.
+       * If it is set to `0`, then there is no limit; PixiJS will render as many frames as it can.
+       * Otherwise it will be at least `minFPS`
+       * @member {number}
+       * @default 0
+       */
+      get maxFPS() {
+        if (this._minElapsedMS) {
+          return Math.round(1e3 / this._minElapsedMS);
+        }
+        return 0;
+      }
+      set maxFPS(fps) {
+        if (fps === 0) {
+          this._minElapsedMS = 0;
+        } else {
+          const maxFPS = Math.max(this.minFPS, fps);
+          this._minElapsedMS = 1 / (maxFPS / 1e3);
+        }
+      }
+      /**
+       * The shared ticker instance used by {@link AnimatedSprite} and by
+       * {@link VideoResource} to update animation frames / video textures.
+       *
+       * It may also be used by {@link Application} if created with the `sharedTicker` option property set to true.
+       *
+       * The property {@link ticker.Ticker#autoStart|autoStart} is set to `true` for this instance.
+       * Please follow the examples for usage, including how to opt-out of auto-starting the shared ticker.
+       * @example
+       * import { Ticker } from 'pixi.js';
+       *
+       * const ticker = Ticker.shared;
+       * // Set this to prevent starting this ticker when listeners are added.
+       * // By default this is true only for the Ticker.shared instance.
+       * ticker.autoStart = false;
+       *
+       * // FYI, call this to ensure the ticker is stopped. It should be stopped
+       * // if you have not attempted to render anything yet.
+       * ticker.stop();
+       *
+       * // Call this when you are ready for a running shared ticker.
+       * ticker.start();
+       * @example
+       * import { autoDetectRenderer, Container } from 'pixi.js';
+       *
+       * // You may use the shared ticker to render...
+       * const renderer = autoDetectRenderer();
+       * const stage = new Container();
+       * document.body.appendChild(renderer.view);
+       * ticker.add((time) => renderer.render(stage));
+       *
+       * // Or you can just update it manually.
+       * ticker.autoStart = false;
+       * ticker.stop();
+       * const animate = (time) => {
+       *     ticker.update(time);
+       *     renderer.render(stage);
+       *     requestAnimationFrame(animate);
+       * };
+       * animate(performance.now());
+       * @member {ticker.Ticker}
+       * @readonly
+       * @static
+       */
+      static get shared() {
+        if (!_Ticker._shared) {
+          const shared = _Ticker._shared = new _Ticker();
+          shared.autoStart = true;
+          shared._protected = true;
+        }
+        return _Ticker._shared;
+      }
+      /**
+       * The system ticker instance used by {@link BasePrepare} for core timing
+       * functionality that shouldn't usually need to be paused, unlike the `shared`
+       * ticker which drives visual animations and rendering which may want to be paused.
+       *
+       * The property {@link ticker.Ticker#autoStart|autoStart} is set to `true` for this instance.
+       * @member {ticker.Ticker}
+       * @readonly
+       * @static
+       */
+      static get system() {
+        if (!_Ticker._system) {
+          const system = _Ticker._system = new _Ticker();
+          system.autoStart = true;
+          system._protected = true;
+        }
+        return _Ticker._system;
+      }
+    };
+    /**
+     * Target frames per millisecond.
+     * @static
+     */
+    _Ticker.targetFPMS = 0.06;
+    let Ticker = _Ticker;
+
+    "use strict";
+    class TickerPlugin {
+      /**
+       * Initialize the plugin with scope of application instance
+       * @static
+       * @private
+       * @param {object} [options] - See application options
+       */
+      static init(options) {
+        options = Object.assign({
+          autoStart: true,
+          sharedTicker: false
+        }, options);
+        Object.defineProperty(
+          this,
+          "ticker",
+          {
+            set(ticker) {
+              if (this._ticker) {
+                this._ticker.remove(this.render, this);
+              }
+              this._ticker = ticker;
+              if (ticker) {
+                ticker.add(this.render, this, UPDATE_PRIORITY.LOW);
+              }
+            },
+            get() {
+              return this._ticker;
+            }
+          }
+        );
+        this.stop = () => {
+          this._ticker.stop();
+        };
+        this.start = () => {
+          this._ticker.start();
+        };
+        this._ticker = null;
+        this.ticker = options.sharedTicker ? Ticker.shared : new Ticker();
+        if (options.autoStart) {
+          this.start();
+        }
+      }
+      /**
+       * Clean up the ticker, scoped to application.
+       * @static
+       * @private
+       */
+      static destroy() {
+        if (this._ticker) {
+          const oldTicker = this._ticker;
+          this.ticker = null;
+          oldTicker.destroy();
+        }
+      }
+    }
+    /** @ignore */
+    TickerPlugin.extension = ExtensionType.Application;
+
+    "use strict";
+    extensions.add(ResizePlugin);
+    extensions.add(TickerPlugin);
+
+    "use strict";
+    var LoaderParserPriority = /* @__PURE__ */ ((LoaderParserPriority2) => {
+      LoaderParserPriority2[LoaderParserPriority2["Low"] = 0] = "Low";
+      LoaderParserPriority2[LoaderParserPriority2["Normal"] = 1] = "Normal";
+      LoaderParserPriority2[LoaderParserPriority2["High"] = 2] = "High";
+      return LoaderParserPriority2;
+    })(LoaderParserPriority || {});
+
+    "use strict";
+    let warnCount = 0;
+    const maxWarnings = 500;
+    function warn(...args) {
+      if (warnCount === maxWarnings)
+        return;
+      warnCount++;
+      if (warnCount === maxWarnings) {
+        console.warn("PixiJS Warning: too many warnings, no more warnings will be reported to the console by PixiJS.");
+      } else {
+        console.warn("PixiJS Warning: ", ...args);
+      }
     }
 
-    function getDefaultExportFromNamespaceIfNotNamed (n) {
-    	return n && Object.prototype.hasOwnProperty.call(n, 'default') && Object.keys(n).length === 1 ? n['default'] : n;
+    "use strict";
+    function assertPath(path2) {
+      if (typeof path2 !== "string") {
+        throw new TypeError(`Path must be a string. Received ${JSON.stringify(path2)}`);
+      }
+    }
+    function removeUrlParams(url) {
+      const re = url.split("?")[0];
+      return re.split("#")[0];
+    }
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    function replaceAll(str, find, replace) {
+      return str.replace(new RegExp(escapeRegExp(find), "g"), replace);
+    }
+    function normalizeStringPosix(path2, allowAboveRoot) {
+      let res = "";
+      let lastSegmentLength = 0;
+      let lastSlash = -1;
+      let dots = 0;
+      let code = -1;
+      for (let i = 0; i <= path2.length; ++i) {
+        if (i < path2.length) {
+          code = path2.charCodeAt(i);
+        } else if (code === 47) {
+          break;
+        } else {
+          code = 47;
+        }
+        if (code === 47) {
+          if (lastSlash === i - 1 || dots === 1) {
+          } else if (lastSlash !== i - 1 && dots === 2) {
+            if (res.length < 2 || lastSegmentLength !== 2 || res.charCodeAt(res.length - 1) !== 46 || res.charCodeAt(res.length - 2) !== 46) {
+              if (res.length > 2) {
+                const lastSlashIndex = res.lastIndexOf("/");
+                if (lastSlashIndex !== res.length - 1) {
+                  if (lastSlashIndex === -1) {
+                    res = "";
+                    lastSegmentLength = 0;
+                  } else {
+                    res = res.slice(0, lastSlashIndex);
+                    lastSegmentLength = res.length - 1 - res.lastIndexOf("/");
+                  }
+                  lastSlash = i;
+                  dots = 0;
+                  continue;
+                }
+              } else if (res.length === 2 || res.length === 1) {
+                res = "";
+                lastSegmentLength = 0;
+                lastSlash = i;
+                dots = 0;
+                continue;
+              }
+            }
+            if (allowAboveRoot) {
+              if (res.length > 0) {
+                res += "/..";
+              } else {
+                res = "..";
+              }
+              lastSegmentLength = 2;
+            }
+          } else {
+            if (res.length > 0) {
+              res += `/${path2.slice(lastSlash + 1, i)}`;
+            } else {
+              res = path2.slice(lastSlash + 1, i);
+            }
+            lastSegmentLength = i - lastSlash - 1;
+          }
+          lastSlash = i;
+          dots = 0;
+        } else if (code === 46 && dots !== -1) {
+          ++dots;
+        } else {
+          dots = -1;
+        }
+      }
+      return res;
+    }
+    const path = {
+      /**
+       * Converts a path to posix format.
+       * @param path - The path to convert to posix
+       */
+      toPosix(path2) {
+        return replaceAll(path2, "\\", "/");
+      },
+      /**
+       * Checks if the path is a URL e.g. http://, https://
+       * @param path - The path to check
+       */
+      isUrl(path2) {
+        return /^https?:/.test(this.toPosix(path2));
+      },
+      /**
+       * Checks if the path is a data URL
+       * @param path - The path to check
+       */
+      isDataUrl(path2) {
+        return /^data:([a-z]+\/[a-z0-9-+.]+(;[a-z0-9-.!#$%*+.{}|~`]+=[a-z0-9-.!#$%*+.{}()_|~`]+)*)?(;base64)?,([a-z0-9!$&',()*+;=\-._~:@\/?%\s<>]*?)$/i.test(path2);
+      },
+      /**
+       * Checks if the path is a blob URL
+       * @param path - The path to check
+       */
+      isBlobUrl(path2) {
+        return path2.startsWith("blob:");
+      },
+      /**
+       * Checks if the path has a protocol e.g. http://, https://, file:///, data:, blob:, C:/
+       * This will return true for windows file paths
+       * @param path - The path to check
+       */
+      hasProtocol(path2) {
+        return /^[^/:]+:/.test(this.toPosix(path2));
+      },
+      /**
+       * Returns the protocol of the path e.g. http://, https://, file:///, data:, blob:, C:/
+       * @param path - The path to get the protocol from
+       */
+      getProtocol(path2) {
+        assertPath(path2);
+        path2 = this.toPosix(path2);
+        const matchFile = /^file:\/\/\//.exec(path2);
+        if (matchFile) {
+          return matchFile[0];
+        }
+        const matchProtocol = /^[^/:]+:\/{0,2}/.exec(path2);
+        if (matchProtocol) {
+          return matchProtocol[0];
+        }
+        return "";
+      },
+      /**
+       * Converts URL to an absolute path.
+       * When loading from a Web Worker, we must use absolute paths.
+       * If the URL is already absolute we return it as is
+       * If it's not, we convert it
+       * @param url - The URL to test
+       * @param customBaseUrl - The base URL to use
+       * @param customRootUrl - The root URL to use
+       */
+      toAbsolute(url, customBaseUrl, customRootUrl) {
+        assertPath(url);
+        if (this.isDataUrl(url) || this.isBlobUrl(url))
+          return url;
+        const baseUrl = removeUrlParams(this.toPosix(customBaseUrl != null ? customBaseUrl : DOMAdapter.get().getBaseUrl()));
+        const rootUrl = removeUrlParams(this.toPosix(customRootUrl != null ? customRootUrl : this.rootname(baseUrl)));
+        url = this.toPosix(url);
+        if (url.startsWith("/")) {
+          return path.join(rootUrl, url.slice(1));
+        }
+        const absolutePath = this.isAbsolute(url) ? url : this.join(baseUrl, url);
+        return absolutePath;
+      },
+      /**
+       * Normalizes the given path, resolving '..' and '.' segments
+       * @param path - The path to normalize
+       */
+      normalize(path2) {
+        assertPath(path2);
+        if (path2.length === 0)
+          return ".";
+        if (this.isDataUrl(path2) || this.isBlobUrl(path2))
+          return path2;
+        path2 = this.toPosix(path2);
+        let protocol = "";
+        const isAbsolute = path2.startsWith("/");
+        if (this.hasProtocol(path2)) {
+          protocol = this.rootname(path2);
+          path2 = path2.slice(protocol.length);
+        }
+        const trailingSeparator = path2.endsWith("/");
+        path2 = normalizeStringPosix(path2, false);
+        if (path2.length > 0 && trailingSeparator)
+          path2 += "/";
+        if (isAbsolute)
+          return `/${path2}`;
+        return protocol + path2;
+      },
+      /**
+       * Determines if path is an absolute path.
+       * Absolute paths can be urls, data urls, or paths on disk
+       * @param path - The path to test
+       */
+      isAbsolute(path2) {
+        assertPath(path2);
+        path2 = this.toPosix(path2);
+        if (this.hasProtocol(path2))
+          return true;
+        return path2.startsWith("/");
+      },
+      /**
+       * Joins all given path segments together using the platform-specific separator as a delimiter,
+       * then normalizes the resulting path
+       * @param segments - The segments of the path to join
+       */
+      join(...segments) {
+        var _a;
+        if (segments.length === 0) {
+          return ".";
+        }
+        let joined;
+        for (let i = 0; i < segments.length; ++i) {
+          const arg = segments[i];
+          assertPath(arg);
+          if (arg.length > 0) {
+            if (joined === void 0)
+              joined = arg;
+            else {
+              const prevArg = (_a = segments[i - 1]) != null ? _a : "";
+              if (this.joinExtensions.includes(this.extname(prevArg).toLowerCase())) {
+                joined += `/../${arg}`;
+              } else {
+                joined += `/${arg}`;
+              }
+            }
+          }
+        }
+        if (joined === void 0) {
+          return ".";
+        }
+        return this.normalize(joined);
+      },
+      /**
+       * Returns the directory name of a path
+       * @param path - The path to parse
+       */
+      dirname(path2) {
+        assertPath(path2);
+        if (path2.length === 0)
+          return ".";
+        path2 = this.toPosix(path2);
+        let code = path2.charCodeAt(0);
+        const hasRoot = code === 47;
+        let end = -1;
+        let matchedSlash = true;
+        const proto = this.getProtocol(path2);
+        const origpath = path2;
+        path2 = path2.slice(proto.length);
+        for (let i = path2.length - 1; i >= 1; --i) {
+          code = path2.charCodeAt(i);
+          if (code === 47) {
+            if (!matchedSlash) {
+              end = i;
+              break;
+            }
+          } else {
+            matchedSlash = false;
+          }
+        }
+        if (end === -1)
+          return hasRoot ? "/" : this.isUrl(origpath) ? proto + path2 : proto;
+        if (hasRoot && end === 1)
+          return "//";
+        return proto + path2.slice(0, end);
+      },
+      /**
+       * Returns the root of the path e.g. /, C:/, file:///, http://domain.com/
+       * @param path - The path to parse
+       */
+      rootname(path2) {
+        assertPath(path2);
+        path2 = this.toPosix(path2);
+        let root = "";
+        if (path2.startsWith("/"))
+          root = "/";
+        else {
+          root = this.getProtocol(path2);
+        }
+        if (this.isUrl(path2)) {
+          const index = path2.indexOf("/", root.length);
+          if (index !== -1) {
+            root = path2.slice(0, index);
+          } else
+            root = path2;
+          if (!root.endsWith("/"))
+            root += "/";
+        }
+        return root;
+      },
+      /**
+       * Returns the last portion of a path
+       * @param path - The path to test
+       * @param ext - Optional extension to remove
+       */
+      basename(path2, ext) {
+        assertPath(path2);
+        if (ext)
+          assertPath(ext);
+        path2 = removeUrlParams(this.toPosix(path2));
+        let start = 0;
+        let end = -1;
+        let matchedSlash = true;
+        let i;
+        if (ext !== void 0 && ext.length > 0 && ext.length <= path2.length) {
+          if (ext.length === path2.length && ext === path2)
+            return "";
+          let extIdx = ext.length - 1;
+          let firstNonSlashEnd = -1;
+          for (i = path2.length - 1; i >= 0; --i) {
+            const code = path2.charCodeAt(i);
+            if (code === 47) {
+              if (!matchedSlash) {
+                start = i + 1;
+                break;
+              }
+            } else {
+              if (firstNonSlashEnd === -1) {
+                matchedSlash = false;
+                firstNonSlashEnd = i + 1;
+              }
+              if (extIdx >= 0) {
+                if (code === ext.charCodeAt(extIdx)) {
+                  if (--extIdx === -1) {
+                    end = i;
+                  }
+                } else {
+                  extIdx = -1;
+                  end = firstNonSlashEnd;
+                }
+              }
+            }
+          }
+          if (start === end)
+            end = firstNonSlashEnd;
+          else if (end === -1)
+            end = path2.length;
+          return path2.slice(start, end);
+        }
+        for (i = path2.length - 1; i >= 0; --i) {
+          if (path2.charCodeAt(i) === 47) {
+            if (!matchedSlash) {
+              start = i + 1;
+              break;
+            }
+          } else if (end === -1) {
+            matchedSlash = false;
+            end = i + 1;
+          }
+        }
+        if (end === -1)
+          return "";
+        return path2.slice(start, end);
+      },
+      /**
+       * Returns the extension of the path, from the last occurrence of the . (period) character to end of string in the last
+       * portion of the path. If there is no . in the last portion of the path, or if there are no . characters other than
+       * the first character of the basename of path, an empty string is returned.
+       * @param path - The path to parse
+       */
+      extname(path2) {
+        assertPath(path2);
+        path2 = removeUrlParams(this.toPosix(path2));
+        let startDot = -1;
+        let startPart = 0;
+        let end = -1;
+        let matchedSlash = true;
+        let preDotState = 0;
+        for (let i = path2.length - 1; i >= 0; --i) {
+          const code = path2.charCodeAt(i);
+          if (code === 47) {
+            if (!matchedSlash) {
+              startPart = i + 1;
+              break;
+            }
+            continue;
+          }
+          if (end === -1) {
+            matchedSlash = false;
+            end = i + 1;
+          }
+          if (code === 46) {
+            if (startDot === -1)
+              startDot = i;
+            else if (preDotState !== 1)
+              preDotState = 1;
+          } else if (startDot !== -1) {
+            preDotState = -1;
+          }
+        }
+        if (startDot === -1 || end === -1 || preDotState === 0 || preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
+          return "";
+        }
+        return path2.slice(startDot, end);
+      },
+      /**
+       * Parses a path into an object containing the 'root', `dir`, `base`, `ext`, and `name` properties.
+       * @param path - The path to parse
+       */
+      parse(path2) {
+        assertPath(path2);
+        const ret = { root: "", dir: "", base: "", ext: "", name: "" };
+        if (path2.length === 0)
+          return ret;
+        path2 = removeUrlParams(this.toPosix(path2));
+        let code = path2.charCodeAt(0);
+        const isAbsolute = this.isAbsolute(path2);
+        let start;
+        const protocol = "";
+        ret.root = this.rootname(path2);
+        if (isAbsolute || this.hasProtocol(path2)) {
+          start = 1;
+        } else {
+          start = 0;
+        }
+        let startDot = -1;
+        let startPart = 0;
+        let end = -1;
+        let matchedSlash = true;
+        let i = path2.length - 1;
+        let preDotState = 0;
+        for (; i >= start; --i) {
+          code = path2.charCodeAt(i);
+          if (code === 47) {
+            if (!matchedSlash) {
+              startPart = i + 1;
+              break;
+            }
+            continue;
+          }
+          if (end === -1) {
+            matchedSlash = false;
+            end = i + 1;
+          }
+          if (code === 46) {
+            if (startDot === -1)
+              startDot = i;
+            else if (preDotState !== 1)
+              preDotState = 1;
+          } else if (startDot !== -1) {
+            preDotState = -1;
+          }
+        }
+        if (startDot === -1 || end === -1 || preDotState === 0 || preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
+          if (end !== -1) {
+            if (startPart === 0 && isAbsolute)
+              ret.base = ret.name = path2.slice(1, end);
+            else
+              ret.base = ret.name = path2.slice(startPart, end);
+          }
+        } else {
+          if (startPart === 0 && isAbsolute) {
+            ret.name = path2.slice(1, startDot);
+            ret.base = path2.slice(1, end);
+          } else {
+            ret.name = path2.slice(startPart, startDot);
+            ret.base = path2.slice(startPart, end);
+          }
+          ret.ext = path2.slice(startDot, end);
+        }
+        ret.dir = this.dirname(path2);
+        if (protocol)
+          ret.dir = protocol + ret.dir;
+        return ret;
+      },
+      sep: "/",
+      delimiter: ":",
+      joinExtensions: [".html"]
+    };
+
+    "use strict";
+    const convertToList = (input, transform, forceTransform = false) => {
+      if (!Array.isArray(input)) {
+        input = [input];
+      }
+      if (!transform) {
+        return input;
+      }
+      return input.map((item) => {
+        if (typeof item === "string" || forceTransform) {
+          return transform(item);
+        }
+        return item;
+      });
+    };
+
+    "use strict";
+    function processX(base, ids, depth, result, tags) {
+      const id = ids[depth];
+      for (let i = 0; i < id.length; i++) {
+        const value = id[i];
+        if (depth < ids.length - 1) {
+          processX(base.replace(result[depth], value), ids, depth + 1, result, tags);
+        } else {
+          tags.push(base.replace(result[depth], value));
+        }
+      }
+    }
+    function createStringVariations(string) {
+      const regex = /\{(.*?)\}/g;
+      const result = string.match(regex);
+      const tags = [];
+      if (result) {
+        const ids = [];
+        result.forEach((vars) => {
+          const split = vars.substring(1, vars.length - 1).split(",");
+          ids.push(split);
+        });
+        processX(string, ids, 0, result, tags);
+      } else {
+        tags.push(string);
+      }
+      return tags;
     }
 
-    function getAugmentedNamespace(n) {
-      if (n.__esModule) return n;
-      var f = n.default;
-    	if (typeof f == "function") {
-    		var a = function a () {
-    			if (this instanceof a) {
-            return Reflect.construct(f, arguments, this.constructor);
-    			}
-    			return f.apply(this, arguments);
-    		};
-    		a.prototype = f.prototype;
-      } else a = {};
-      Object.defineProperty(a, '__esModule', {value: true});
-    	Object.keys(n).forEach(function (k) {
-    		var d = Object.getOwnPropertyDescriptor(n, k);
-    		Object.defineProperty(a, k, d.get ? d : {
-    			enumerable: true,
-    			get: function () {
-    				return n[k];
-    			}
-    		});
-    	});
-    	return a;
+    "use strict";
+    const isSingleItem = (item) => !Array.isArray(item);
+
+    "use strict";
+    var __defProp$U = Object.defineProperty;
+    var __getOwnPropSymbols$U = Object.getOwnPropertySymbols;
+    var __hasOwnProp$U = Object.prototype.hasOwnProperty;
+    var __propIsEnum$U = Object.prototype.propertyIsEnumerable;
+    var __defNormalProp$U = (obj, key, value) => key in obj ? __defProp$U(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    var __spreadValues$U = (a, b) => {
+      for (var prop in b || (b = {}))
+        if (__hasOwnProp$U.call(b, prop))
+          __defNormalProp$U(a, prop, b[prop]);
+      if (__getOwnPropSymbols$U)
+        for (var prop of __getOwnPropSymbols$U(b)) {
+          if (__propIsEnum$U.call(b, prop))
+            __defNormalProp$U(a, prop, b[prop]);
+        }
+      return a;
+    };
+    class Resolver {
+      constructor() {
+        this._defaultBundleIdentifierOptions = {
+          connector: "-",
+          createBundleAssetId: (bundleId, assetId) => `${bundleId}${this._bundleIdConnector}${assetId}`,
+          extractAssetIdFromBundle: (bundleId, assetBundleId) => assetBundleId.replace(`${bundleId}${this._bundleIdConnector}`, "")
+        };
+        /** The character that is used to connect the bundleId and the assetId when generating a bundle asset id key */
+        this._bundleIdConnector = this._defaultBundleIdentifierOptions.connector;
+        /**
+         * A function that generates a bundle asset id key from a bundleId and an assetId
+         * @param bundleId - the bundleId
+         * @param assetId  - the assetId
+         * @returns the bundle asset id key
+         */
+        this._createBundleAssetId = this._defaultBundleIdentifierOptions.createBundleAssetId;
+        /**
+         * A function that generates an assetId from a bundle asset id key. This is the reverse of generateBundleAssetId
+         * @param bundleId - the bundleId
+         * @param assetBundleId - the bundle asset id key
+         * @returns the assetId
+         */
+        this._extractAssetIdFromBundle = this._defaultBundleIdentifierOptions.extractAssetIdFromBundle;
+        this._assetMap = {};
+        this._preferredOrder = [];
+        this._parsers = [];
+        this._resolverHash = {};
+        this._bundles = {};
+      }
+      /**
+       * Override how the resolver deals with generating bundle ids.
+       * must be called before any bundles are added
+       * @param bundleIdentifier - the bundle identifier options
+       */
+      setBundleIdentifier(bundleIdentifier) {
+        var _a, _b, _c;
+        this._bundleIdConnector = (_a = bundleIdentifier.connector) != null ? _a : this._bundleIdConnector;
+        this._createBundleAssetId = (_b = bundleIdentifier.createBundleAssetId) != null ? _b : this._createBundleAssetId;
+        this._extractAssetIdFromBundle = (_c = bundleIdentifier.extractAssetIdFromBundle) != null ? _c : this._extractAssetIdFromBundle;
+        if (this._extractAssetIdFromBundle("foo", this._createBundleAssetId("foo", "bar")) !== "bar") {
+          throw new Error("[Resolver] GenerateBundleAssetId are not working correctly");
+        }
+      }
+      /**
+       * Let the resolver know which assets you prefer to use when resolving assets.
+       * Multiple prefer user defined rules can be added.
+       * @example
+       * resolver.prefer({
+       *     // first look for something with the correct format, and then then correct resolution
+       *     priority: ['format', 'resolution'],
+       *     params:{
+       *         format:'webp', // prefer webp images
+       *         resolution: 2, // prefer a resolution of 2
+       *     }
+       * })
+       * resolver.add('foo', ['bar@2x.webp', 'bar@2x.png', 'bar.webp', 'bar.png']);
+       * resolver.resolveUrl('foo') // => 'bar@2x.webp'
+       * @param preferOrders - the prefer options
+       */
+      prefer(...preferOrders) {
+        preferOrders.forEach((prefer) => {
+          this._preferredOrder.push(prefer);
+          if (!prefer.priority) {
+            prefer.priority = Object.keys(prefer.params);
+          }
+        });
+        this._resolverHash = {};
+      }
+      /**
+       * Set the base path to prepend to all urls when resolving
+       * @example
+       * resolver.basePath = 'https://home.com/';
+       * resolver.add('foo', 'bar.ong');
+       * resolver.resolveUrl('foo', 'bar.png'); // => 'https://home.com/bar.png'
+       * @param basePath - the base path to use
+       */
+      set basePath(basePath) {
+        this._basePath = basePath;
+      }
+      get basePath() {
+        return this._basePath;
+      }
+      /**
+       * Set the root path for root-relative URLs. By default the `basePath`'s root is used. If no `basePath` is set, then the
+       * default value for browsers is `window.location.origin`
+       * @example
+       * // Application hosted on https://home.com/some-path/index.html
+       * resolver.basePath = 'https://home.com/some-path/';
+       * resolver.rootPath = 'https://home.com/';
+       * resolver.add('foo', '/bar.png');
+       * resolver.resolveUrl('foo', '/bar.png'); // => 'https://home.com/bar.png'
+       * @param rootPath - the root path to use
+       */
+      set rootPath(rootPath) {
+        this._rootPath = rootPath;
+      }
+      get rootPath() {
+        return this._rootPath;
+      }
+      /**
+       * All the active URL parsers that help the parser to extract information and create
+       * an asset object-based on parsing the URL itself.
+       *
+       * Can be added using the extensions API
+       * @example
+       * resolver.add('foo', [
+       *     {
+       *         resolution: 2,
+       *         format: 'png',
+       *         src: 'image@2x.png',
+       *     },
+       *     {
+       *         resolution:1,
+       *         format:'png',
+       *         src: 'image.png',
+       *     },
+       * ]);
+       *
+       * // With a url parser the information such as resolution and file format could extracted from the url itself:
+       * extensions.add({
+       *     extension: ExtensionType.ResolveParser,
+       *     test: loadTextures.test, // test if url ends in an image
+       *     parse: (value: string) =>
+       *     ({
+       *         resolution: parseFloat(Resolver.RETINA_PREFIX.exec(value)?.[1] ?? '1'),
+       *         format: value.split('.').pop(),
+       *         src: value,
+       *     }),
+       * });
+       *
+       * // Now resolution and format can be extracted from the url
+       * resolver.add('foo', [
+       *     'image@2x.png',
+       *     'image.png',
+       * ]);
+       */
+      get parsers() {
+        return this._parsers;
+      }
+      /** Used for testing, this resets the resolver to its initial state */
+      reset() {
+        this.setBundleIdentifier(this._defaultBundleIdentifierOptions);
+        this._assetMap = {};
+        this._preferredOrder = [];
+        this._resolverHash = {};
+        this._rootPath = null;
+        this._basePath = null;
+        this._manifest = null;
+        this._bundles = {};
+        this._defaultSearchParams = null;
+      }
+      /**
+       * Sets the default URL search parameters for the URL resolver. The urls can be specified as a string or an object.
+       * @param searchParams - the default url parameters to append when resolving urls
+       */
+      setDefaultSearchParams(searchParams) {
+        if (typeof searchParams === "string") {
+          this._defaultSearchParams = searchParams;
+        } else {
+          const queryValues = searchParams;
+          this._defaultSearchParams = Object.keys(queryValues).map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(queryValues[key])}`).join("&");
+        }
+      }
+      /**
+       * Returns the aliases for a given asset
+       * @param asset - the asset to get the aliases for
+       */
+      getAlias(asset) {
+        const { alias, src } = asset;
+        const aliasesToUse = convertToList(
+          alias || src,
+          (value) => {
+            if (typeof value === "string")
+              return value;
+            if (Array.isArray(value))
+              return value.map((v) => {
+                var _a;
+                return (_a = v == null ? void 0 : v.src) != null ? _a : v;
+              });
+            if (value == null ? void 0 : value.src)
+              return value.src;
+            return value;
+          },
+          true
+        );
+        return aliasesToUse;
+      }
+      /**
+       * Add a manifest to the asset resolver. This is a nice way to add all the asset information in one go.
+       * generally a manifest would be built using a tool.
+       * @param manifest - the manifest to add to the resolver
+       */
+      addManifest(manifest) {
+        if (this._manifest) {
+          warn("[Resolver] Manifest already exists, this will be overwritten");
+        }
+        this._manifest = manifest;
+        manifest.bundles.forEach((bundle) => {
+          this.addBundle(bundle.name, bundle.assets);
+        });
+      }
+      /**
+       * This adds a bundle of assets in one go so that you can resolve them as a group.
+       * For example you could add a bundle for each screen in you pixi app
+       * @example
+       * resolver.addBundle('animals', {
+       *     bunny: 'bunny.png',
+       *     chicken: 'chicken.png',
+       *     thumper: 'thumper.png',
+       * });
+       *
+       * const resolvedAssets = await resolver.resolveBundle('animals');
+       * @param bundleId - The id of the bundle to add
+       * @param assets - A record of the asset or assets that will be chosen from when loading via the specified key
+       */
+      addBundle(bundleId, assets) {
+        const assetNames = [];
+        assets.forEach((asset) => {
+          const srcs = asset.src;
+          const aliases = asset.alias;
+          let ids;
+          if (typeof aliases === "string") {
+            const bundleAssetId = this._createBundleAssetId(bundleId, aliases);
+            assetNames.push(bundleAssetId);
+            ids = [aliases, bundleAssetId];
+          } else {
+            const bundleIds = aliases.map((name) => this._createBundleAssetId(bundleId, name));
+            assetNames.push(...bundleIds);
+            ids = [...aliases, ...bundleIds];
+          }
+          this.add(__spreadValues$U(__spreadValues$U({}, asset), {
+            alias: ids,
+            src: srcs
+          }));
+        });
+        this._bundles[bundleId] = assetNames;
+      }
+      /**
+       * Tells the resolver what keys are associated with witch asset.
+       * The most important thing the resolver does
+       * @example
+       * // Single key, single asset:
+       * resolver.add({alias: 'foo', src: 'bar.png');
+       * resolver.resolveUrl('foo') // => 'bar.png'
+       *
+       * // Multiple keys, single asset:
+       * resolver.add({alias: ['foo', 'boo'], src: 'bar.png'});
+       * resolver.resolveUrl('foo') // => 'bar.png'
+       * resolver.resolveUrl('boo') // => 'bar.png'
+       *
+       * // Multiple keys, multiple assets:
+       * resolver.add({alias: ['foo', 'boo'], src: ['bar.png', 'bar.webp']});
+       * resolver.resolveUrl('foo') // => 'bar.png'
+       *
+       * // Add custom data attached to the resolver
+       * Resolver.add({
+       *     alias: 'bunnyBooBooSmooth',
+       *     src: 'bunny{png,webp}',
+       *     data: { scaleMode:SCALE_MODES.NEAREST }, // Base texture options
+       * });
+       *
+       * resolver.resolve('bunnyBooBooSmooth') // => { src: 'bunny.png', data: { scaleMode: SCALE_MODES.NEAREST } }
+       * @param aliases - the UnresolvedAsset or array of UnresolvedAssets to add to the resolver
+       */
+      add(aliases) {
+        const assets = [];
+        if (Array.isArray(aliases)) {
+          assets.push(...aliases);
+        } else {
+          assets.push(aliases);
+        }
+        let keyCheck;
+        keyCheck = (key) => {
+          if (this.hasKey(key)) {
+            warn(`[Resolver] already has key: ${key} overwriting`);
+          }
+        };
+        const assetArray = convertToList(assets);
+        assetArray.forEach((asset) => {
+          const { src } = asset;
+          let { data, format, loadParser } = asset;
+          const srcsToUse = convertToList(src).map((src2) => {
+            if (typeof src2 === "string") {
+              return createStringVariations(src2);
+            }
+            return Array.isArray(src2) ? src2 : [src2];
+          });
+          const aliasesToUse = this.getAlias(asset);
+          Array.isArray(aliasesToUse) ? aliasesToUse.forEach(keyCheck) : keyCheck(aliasesToUse);
+          const resolvedAssets = [];
+          srcsToUse.forEach((srcs) => {
+            srcs.forEach((src2) => {
+              var _a, _b, _c;
+              let formattedAsset = {};
+              if (typeof src2 !== "object") {
+                formattedAsset.src = src2;
+                for (let i = 0; i < this._parsers.length; i++) {
+                  const parser = this._parsers[i];
+                  if (parser.test(src2)) {
+                    formattedAsset = parser.parse(src2);
+                    break;
+                  }
+                }
+              } else {
+                data = (_a = src2.data) != null ? _a : data;
+                format = (_b = src2.format) != null ? _b : format;
+                loadParser = (_c = src2.loadParser) != null ? _c : loadParser;
+                formattedAsset = __spreadValues$U(__spreadValues$U({}, formattedAsset), src2);
+              }
+              if (!aliasesToUse) {
+                throw new Error(`[Resolver] alias is undefined for this asset: ${formattedAsset.src}`);
+              }
+              formattedAsset = this._buildResolvedAsset(formattedAsset, {
+                aliases: aliasesToUse,
+                data,
+                format,
+                loadParser
+              });
+              resolvedAssets.push(formattedAsset);
+            });
+          });
+          aliasesToUse.forEach((alias) => {
+            this._assetMap[alias] = resolvedAssets;
+          });
+        });
+      }
+      // TODO: this needs an overload like load did in Assets
+      /**
+       * If the resolver has had a manifest set via setManifest, this will return the assets urls for
+       * a given bundleId or bundleIds.
+       * @example
+       * // Manifest Example
+       * const manifest = {
+       *     bundles: [
+       *         {
+       *             name: 'load-screen',
+       *             assets: [
+       *                 {
+       *                     alias: 'background',
+       *                     src: 'sunset.png',
+       *                 },
+       *                 {
+       *                     alias: 'bar',
+       *                     src: 'load-bar.{png,webp}',
+       *                 },
+       *             ],
+       *         },
+       *         {
+       *             name: 'game-screen',
+       *             assets: [
+       *                 {
+       *                     alias: 'character',
+       *                     src: 'robot.png',
+       *                 },
+       *                 {
+       *                     alias: 'enemy',
+       *                     src: 'bad-guy.png',
+       *                 },
+       *             ],
+       *         },
+       *     ]
+       * };
+       *
+       * resolver.setManifest(manifest);
+       * const resolved = resolver.resolveBundle('load-screen');
+       * @param bundleIds - The bundle ids to resolve
+       * @returns All the bundles assets or a hash of assets for each bundle specified
+       */
+      resolveBundle(bundleIds) {
+        const singleAsset = isSingleItem(bundleIds);
+        bundleIds = convertToList(bundleIds);
+        const out = {};
+        bundleIds.forEach((bundleId) => {
+          const assetNames = this._bundles[bundleId];
+          if (assetNames) {
+            const results = this.resolve(assetNames);
+            const assets = {};
+            for (const key in results) {
+              const asset = results[key];
+              assets[this._extractAssetIdFromBundle(bundleId, key)] = asset;
+            }
+            out[bundleId] = assets;
+          }
+        });
+        return singleAsset ? out[bundleIds[0]] : out;
+      }
+      /**
+       * Does exactly what resolve does, but returns just the URL rather than the whole asset object
+       * @param key - The key or keys to resolve
+       * @returns - The URLs associated with the key(s)
+       */
+      resolveUrl(key) {
+        const result = this.resolve(key);
+        if (typeof key !== "string") {
+          const out = {};
+          for (const i in result) {
+            out[i] = result[i].src;
+          }
+          return out;
+        }
+        return result.src;
+      }
+      resolve(keys) {
+        const singleAsset = isSingleItem(keys);
+        keys = convertToList(keys);
+        const result = {};
+        keys.forEach((key) => {
+          if (!this._resolverHash[key]) {
+            if (this._assetMap[key]) {
+              let assets = this._assetMap[key];
+              const preferredOrder = this._getPreferredOrder(assets);
+              preferredOrder == null ? void 0 : preferredOrder.priority.forEach((priorityKey) => {
+                preferredOrder.params[priorityKey].forEach((value) => {
+                  const filteredAssets = assets.filter((asset) => {
+                    if (asset[priorityKey]) {
+                      return asset[priorityKey] === value;
+                    }
+                    return false;
+                  });
+                  if (filteredAssets.length) {
+                    assets = filteredAssets;
+                  }
+                });
+              });
+              this._resolverHash[key] = assets[0];
+            } else {
+              this._resolverHash[key] = this._buildResolvedAsset({
+                alias: [key],
+                src: key
+              }, {});
+            }
+          }
+          result[key] = this._resolverHash[key];
+        });
+        return singleAsset ? result[keys[0]] : result;
+      }
+      /**
+       * Checks if an asset with a given key exists in the resolver
+       * @param key - The key of the asset
+       */
+      hasKey(key) {
+        return !!this._assetMap[key];
+      }
+      /**
+       * Checks if a bundle with the given key exists in the resolver
+       * @param key - The key of the bundle
+       */
+      hasBundle(key) {
+        return !!this._bundles[key];
+      }
+      /**
+       * Internal function for figuring out what prefer criteria an asset should use.
+       * @param assets
+       */
+      _getPreferredOrder(assets) {
+        for (let i = 0; i < assets.length; i++) {
+          const asset = assets[0];
+          const preferred = this._preferredOrder.find((preference) => preference.params.format.includes(asset.format));
+          if (preferred) {
+            return preferred;
+          }
+        }
+        return this._preferredOrder[0];
+      }
+      /**
+       * Appends the default url parameters to the url
+       * @param url - The url to append the default parameters to
+       * @returns - The url with the default parameters appended
+       */
+      _appendDefaultSearchParams(url) {
+        if (!this._defaultSearchParams)
+          return url;
+        const paramConnector = /\?/.test(url) ? "&" : "?";
+        return `${url}${paramConnector}${this._defaultSearchParams}`;
+      }
+      _buildResolvedAsset(formattedAsset, data) {
+        var _a, _b;
+        const { aliases, data: assetData, loadParser, format } = data;
+        if (this._basePath || this._rootPath) {
+          formattedAsset.src = path.toAbsolute(formattedAsset.src, this._basePath, this._rootPath);
+        }
+        formattedAsset.alias = (_a = aliases != null ? aliases : formattedAsset.alias) != null ? _a : [formattedAsset.src];
+        formattedAsset.src = this._appendDefaultSearchParams(formattedAsset.src);
+        formattedAsset.data = __spreadValues$U(__spreadValues$U({}, assetData || {}), formattedAsset.data);
+        formattedAsset.loadParser = loadParser != null ? loadParser : formattedAsset.loadParser;
+        formattedAsset.format = (_b = format != null ? format : formattedAsset.format) != null ? _b : getUrlExtension(formattedAsset.src);
+        return formattedAsset;
+      }
     }
+    /**
+     * The prefix that denotes a URL is for a retina asset.
+     * @static
+     * @name RETINA_PREFIX
+     * @type {RegExp}
+     * @default /@([0-9\.]+)x/
+     * @example `@2x`
+     */
+    Resolver.RETINA_PREFIX = /@([0-9\.]+)x/;
+    function getUrlExtension(url) {
+      return url.split(".").pop().split("?").shift().split("#").shift();
+    }
+
+    "use strict";
+    const copySearchParams = (targetUrl, sourceUrl) => {
+      const searchParams = sourceUrl.split("?")[1];
+      if (searchParams) {
+        targetUrl += `?${searchParams}`;
+      }
+      return targetUrl;
+    };
 
     var eventemitter3$1 = {exports: {}};
 
@@ -595,422 +7572,99 @@ var PIXI = (function (exports) {
     var eventemitter3Exports = eventemitter3$1.exports;
     var EventEmitter = /*@__PURE__*/getDefaultExportFromCjs(eventemitter3Exports);
 
-    var r={grad:.9,turn:360,rad:360/(2*Math.PI)},t=function(r){return "string"==typeof r?r.length>0:"number"==typeof r},n=function(r,t,n){return void 0===t&&(t=0),void 0===n&&(n=Math.pow(10,t)),Math.round(n*r)/n+0},e=function(r,t,n){return void 0===t&&(t=0),void 0===n&&(n=1),r>n?n:r>t?r:t},u=function(r){return (r=isFinite(r)?r%360:0)>0?r:r+360},a=function(r){return {r:e(r.r,0,255),g:e(r.g,0,255),b:e(r.b,0,255),a:e(r.a)}},o=function(r){return {r:n(r.r),g:n(r.g),b:n(r.b),a:n(r.a,3)}},i=/^#([0-9a-f]{3,8})$/i,s=function(r){var t=r.toString(16);return t.length<2?"0"+t:t},h=function(r){var t=r.r,n=r.g,e=r.b,u=r.a,a=Math.max(t,n,e),o=a-Math.min(t,n,e),i=o?a===t?(n-e)/o:a===n?2+(e-t)/o:4+(t-n)/o:0;return {h:60*(i<0?i+6:i),s:a?o/a*100:0,v:a/255*100,a:u}},b=function(r){var t=r.h,n=r.s,e=r.v,u=r.a;t=t/360*6,n/=100,e/=100;var a=Math.floor(t),o=e*(1-n),i=e*(1-(t-a)*n),s=e*(1-(1-t+a)*n),h=a%6;return {r:255*[e,i,o,o,s,e][h],g:255*[s,e,e,i,o,o][h],b:255*[o,o,s,e,e,i][h],a:u}},g=function(r){return {h:u(r.h),s:e(r.s,0,100),l:e(r.l,0,100),a:e(r.a)}},d=function(r){return {h:n(r.h),s:n(r.s),l:n(r.l),a:n(r.a,3)}},f=function(r){return b((n=(t=r).s,{h:t.h,s:(n*=((e=t.l)<50?e:100-e)/100)>0?2*n/(e+n)*100:0,v:e+n,a:t.a}));var t,n,e;},c=function(r){return {h:(t=h(r)).h,s:(u=(200-(n=t.s))*(e=t.v)/100)>0&&u<200?n*e/100/(u<=100?u:200-u)*100:0,l:u/2,a:t.a};var t,n,e,u;},l=/^hsla?\(\s*([+-]?\d*\.?\d+)(deg|rad|grad|turn)?\s*,\s*([+-]?\d*\.?\d+)%\s*,\s*([+-]?\d*\.?\d+)%\s*(?:,\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,p=/^hsla?\(\s*([+-]?\d*\.?\d+)(deg|rad|grad|turn)?\s+([+-]?\d*\.?\d+)%\s+([+-]?\d*\.?\d+)%\s*(?:\/\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,v=/^rgba?\(\s*([+-]?\d*\.?\d+)(%)?\s*,\s*([+-]?\d*\.?\d+)(%)?\s*,\s*([+-]?\d*\.?\d+)(%)?\s*(?:,\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,m=/^rgba?\(\s*([+-]?\d*\.?\d+)(%)?\s+([+-]?\d*\.?\d+)(%)?\s+([+-]?\d*\.?\d+)(%)?\s*(?:\/\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,y={string:[[function(r){var t=i.exec(r);return t?(r=t[1]).length<=4?{r:parseInt(r[0]+r[0],16),g:parseInt(r[1]+r[1],16),b:parseInt(r[2]+r[2],16),a:4===r.length?n(parseInt(r[3]+r[3],16)/255,2):1}:6===r.length||8===r.length?{r:parseInt(r.substr(0,2),16),g:parseInt(r.substr(2,2),16),b:parseInt(r.substr(4,2),16),a:8===r.length?n(parseInt(r.substr(6,2),16)/255,2):1}:null:null},"hex"],[function(r){var t=v.exec(r)||m.exec(r);return t?t[2]!==t[4]||t[4]!==t[6]?null:a({r:Number(t[1])/(t[2]?100/255:1),g:Number(t[3])/(t[4]?100/255:1),b:Number(t[5])/(t[6]?100/255:1),a:void 0===t[7]?1:Number(t[7])/(t[8]?100:1)}):null},"rgb"],[function(t){var n=l.exec(t)||p.exec(t);if(!n)return null;var e,u,a=g({h:(e=n[1],u=n[2],void 0===u&&(u="deg"),Number(e)*(r[u]||1)),s:Number(n[3]),l:Number(n[4]),a:void 0===n[5]?1:Number(n[5])/(n[6]?100:1)});return f(a)},"hsl"]],object:[[function(r){var n=r.r,e=r.g,u=r.b,o=r.a,i=void 0===o?1:o;return t(n)&&t(e)&&t(u)?a({r:Number(n),g:Number(e),b:Number(u),a:Number(i)}):null},"rgb"],[function(r){var n=r.h,e=r.s,u=r.l,a=r.a,o=void 0===a?1:a;if(!t(n)||!t(e)||!t(u))return null;var i=g({h:Number(n),s:Number(e),l:Number(u),a:Number(o)});return f(i)},"hsl"],[function(r){var n=r.h,a=r.s,o=r.v,i=r.a,s=void 0===i?1:i;if(!t(n)||!t(a)||!t(o))return null;var h=function(r){return {h:u(r.h),s:e(r.s,0,100),v:e(r.v,0,100),a:e(r.a)}}({h:Number(n),s:Number(a),v:Number(o),a:Number(s)});return b(h)},"hsv"]]},N=function(r,t){for(var n=0;n<t.length;n++){var e=t[n][0](r);if(e)return [e,t[n][1]]}return [null,void 0]},x=function(r){return "string"==typeof r?N(r.trim(),y.string):"object"==typeof r&&null!==r?N(r,y.object):[null,void 0]},I=function(r){return x(r)[1]},M=function(r,t){var n=c(r);return {h:n.h,s:e(n.s+100*t,0,100),l:n.l,a:n.a}},H=function(r){return (299*r.r+587*r.g+114*r.b)/1e3/255},$=function(r,t){var n=c(r);return {h:n.h,s:n.s,l:e(n.l+100*t,0,100),a:n.a}},j=function(){function r(r){this.parsed=x(r)[0],this.rgba=this.parsed||{r:0,g:0,b:0,a:1};}return r.prototype.isValid=function(){return null!==this.parsed},r.prototype.brightness=function(){return n(H(this.rgba),2)},r.prototype.isDark=function(){return H(this.rgba)<.5},r.prototype.isLight=function(){return H(this.rgba)>=.5},r.prototype.toHex=function(){return r=o(this.rgba),t=r.r,e=r.g,u=r.b,i=(a=r.a)<1?s(n(255*a)):"","#"+s(t)+s(e)+s(u)+i;var r,t,e,u,a,i;},r.prototype.toRgb=function(){return o(this.rgba)},r.prototype.toRgbString=function(){return r=o(this.rgba),t=r.r,n=r.g,e=r.b,(u=r.a)<1?"rgba("+t+", "+n+", "+e+", "+u+")":"rgb("+t+", "+n+", "+e+")";var r,t,n,e,u;},r.prototype.toHsl=function(){return d(c(this.rgba))},r.prototype.toHslString=function(){return r=d(c(this.rgba)),t=r.h,n=r.s,e=r.l,(u=r.a)<1?"hsla("+t+", "+n+"%, "+e+"%, "+u+")":"hsl("+t+", "+n+"%, "+e+"%)";var r,t,n,e,u;},r.prototype.toHsv=function(){return r=h(this.rgba),{h:n(r.h),s:n(r.s),v:n(r.v),a:n(r.a,3)};var r;},r.prototype.invert=function(){return w({r:255-(r=this.rgba).r,g:255-r.g,b:255-r.b,a:r.a});var r;},r.prototype.saturate=function(r){return void 0===r&&(r=.1),w(M(this.rgba,r))},r.prototype.desaturate=function(r){return void 0===r&&(r=.1),w(M(this.rgba,-r))},r.prototype.grayscale=function(){return w(M(this.rgba,-1))},r.prototype.lighten=function(r){return void 0===r&&(r=.1),w($(this.rgba,r))},r.prototype.darken=function(r){return void 0===r&&(r=.1),w($(this.rgba,-r))},r.prototype.rotate=function(r){return void 0===r&&(r=15),this.hue(this.hue()+r)},r.prototype.alpha=function(r){return "number"==typeof r?w({r:(t=this.rgba).r,g:t.g,b:t.b,a:r}):n(this.rgba.a,3);var t;},r.prototype.hue=function(r){var t=c(this.rgba);return "number"==typeof r?w({h:r,s:t.s,l:t.l,a:t.a}):n(t.h)},r.prototype.isEqual=function(r){return this.toHex()===w(r).toHex()},r}(),w=function(r){return r instanceof j?r:new j(r)},S=[],k=function(r){r.forEach(function(r){S.indexOf(r)<0&&(r(j,y),S.push(r));});},E=function(){return new j({r:255*Math.random(),g:255*Math.random(),b:255*Math.random()})};
-
-    function namesPlugin(e,f){var a={white:"#ffffff",bisque:"#ffe4c4",blue:"#0000ff",cadetblue:"#5f9ea0",chartreuse:"#7fff00",chocolate:"#d2691e",coral:"#ff7f50",antiquewhite:"#faebd7",aqua:"#00ffff",azure:"#f0ffff",whitesmoke:"#f5f5f5",papayawhip:"#ffefd5",plum:"#dda0dd",blanchedalmond:"#ffebcd",black:"#000000",gold:"#ffd700",goldenrod:"#daa520",gainsboro:"#dcdcdc",cornsilk:"#fff8dc",cornflowerblue:"#6495ed",burlywood:"#deb887",aquamarine:"#7fffd4",beige:"#f5f5dc",crimson:"#dc143c",cyan:"#00ffff",darkblue:"#00008b",darkcyan:"#008b8b",darkgoldenrod:"#b8860b",darkkhaki:"#bdb76b",darkgray:"#a9a9a9",darkgreen:"#006400",darkgrey:"#a9a9a9",peachpuff:"#ffdab9",darkmagenta:"#8b008b",darkred:"#8b0000",darkorchid:"#9932cc",darkorange:"#ff8c00",darkslateblue:"#483d8b",gray:"#808080",darkslategray:"#2f4f4f",darkslategrey:"#2f4f4f",deeppink:"#ff1493",deepskyblue:"#00bfff",wheat:"#f5deb3",firebrick:"#b22222",floralwhite:"#fffaf0",ghostwhite:"#f8f8ff",darkviolet:"#9400d3",magenta:"#ff00ff",green:"#008000",dodgerblue:"#1e90ff",grey:"#808080",honeydew:"#f0fff0",hotpink:"#ff69b4",blueviolet:"#8a2be2",forestgreen:"#228b22",lawngreen:"#7cfc00",indianred:"#cd5c5c",indigo:"#4b0082",fuchsia:"#ff00ff",brown:"#a52a2a",maroon:"#800000",mediumblue:"#0000cd",lightcoral:"#f08080",darkturquoise:"#00ced1",lightcyan:"#e0ffff",ivory:"#fffff0",lightyellow:"#ffffe0",lightsalmon:"#ffa07a",lightseagreen:"#20b2aa",linen:"#faf0e6",mediumaquamarine:"#66cdaa",lemonchiffon:"#fffacd",lime:"#00ff00",khaki:"#f0e68c",mediumseagreen:"#3cb371",limegreen:"#32cd32",mediumspringgreen:"#00fa9a",lightskyblue:"#87cefa",lightblue:"#add8e6",midnightblue:"#191970",lightpink:"#ffb6c1",mistyrose:"#ffe4e1",moccasin:"#ffe4b5",mintcream:"#f5fffa",lightslategray:"#778899",lightslategrey:"#778899",navajowhite:"#ffdead",navy:"#000080",mediumvioletred:"#c71585",powderblue:"#b0e0e6",palegoldenrod:"#eee8aa",oldlace:"#fdf5e6",paleturquoise:"#afeeee",mediumturquoise:"#48d1cc",mediumorchid:"#ba55d3",rebeccapurple:"#663399",lightsteelblue:"#b0c4de",mediumslateblue:"#7b68ee",thistle:"#d8bfd8",tan:"#d2b48c",orchid:"#da70d6",mediumpurple:"#9370db",purple:"#800080",pink:"#ffc0cb",skyblue:"#87ceeb",springgreen:"#00ff7f",palegreen:"#98fb98",red:"#ff0000",yellow:"#ffff00",slateblue:"#6a5acd",lavenderblush:"#fff0f5",peru:"#cd853f",palevioletred:"#db7093",violet:"#ee82ee",teal:"#008080",slategray:"#708090",slategrey:"#708090",aliceblue:"#f0f8ff",darkseagreen:"#8fbc8f",darkolivegreen:"#556b2f",greenyellow:"#adff2f",seagreen:"#2e8b57",seashell:"#fff5ee",tomato:"#ff6347",silver:"#c0c0c0",sienna:"#a0522d",lavender:"#e6e6fa",lightgreen:"#90ee90",orange:"#ffa500",orangered:"#ff4500",steelblue:"#4682b4",royalblue:"#4169e1",turquoise:"#40e0d0",yellowgreen:"#9acd32",salmon:"#fa8072",saddlebrown:"#8b4513",sandybrown:"#f4a460",rosybrown:"#bc8f8f",darksalmon:"#e9967a",lightgoldenrodyellow:"#fafad2",snow:"#fffafa",lightgrey:"#d3d3d3",lightgray:"#d3d3d3",dimgray:"#696969",dimgrey:"#696969",olivedrab:"#6b8e23",olive:"#808000"},r={};for(var d in a)r[a[d]]=d;var l={};e.prototype.toName=function(f){if(!(this.rgba.a||this.rgba.r||this.rgba.g||this.rgba.b))return "transparent";var d,i,n=r[this.toHex()];if(n)return n;if(null==f?void 0:f.closest){var o=this.toRgb(),t=1/0,b="black";if(!l.length)for(var c in a)l[c]=new e(a[c]).toRgb();for(var g in a){var u=(d=o,i=l[g],Math.pow(d.r-i.r,2)+Math.pow(d.g-i.g,2)+Math.pow(d.b-i.b,2));u<t&&(t=u,b=g);}return b}};f.string.push([function(f){var r=f.toLowerCase(),d="transparent"===r?"#0000":a[r];return d?new e(d).toRgb():null},"name"]);}
-
     "use strict";
-    var __defProp$V = Object.defineProperty;
-    var __getOwnPropSymbols$V = Object.getOwnPropertySymbols;
-    var __hasOwnProp$V = Object.prototype.hasOwnProperty;
-    var __propIsEnum$V = Object.prototype.propertyIsEnumerable;
-    var __defNormalProp$V = (obj, key, value) => key in obj ? __defProp$V(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-    var __spreadValues$V = (a, b) => {
-      for (var prop in b || (b = {}))
-        if (__hasOwnProp$V.call(b, prop))
-          __defNormalProp$V(a, prop, b[prop]);
-      if (__getOwnPropSymbols$V)
-        for (var prop of __getOwnPropSymbols$V(b)) {
-          if (__propIsEnum$V.call(b, prop))
-            __defNormalProp$V(a, prop, b[prop]);
+    class CacheClass {
+      constructor() {
+        this._parsers = [];
+        this._cache = /* @__PURE__ */ new Map();
+        this._cacheMap = /* @__PURE__ */ new Map();
+      }
+      /** Clear all entries. */
+      reset() {
+        this._cacheMap.clear();
+        this._cache.clear();
+      }
+      /**
+       * Check if the key exists
+       * @param key - The key to check
+       */
+      has(key) {
+        return this._cache.has(key);
+      }
+      /**
+       * Fetch entry by key
+       * @param key - The key of the entry to get
+       */
+      get(key) {
+        const result = this._cache.get(key);
+        if (!result) {
+          warn(`[Assets] Asset id ${key} was not found in the Cache`);
         }
-      return a;
-    };
-    k([namesPlugin]);
-    const _Color = class _Color {
-      /**
-       * @param {ColorSource} value - Optional value to use, if not provided, white is used.
-       */
-      constructor(value = 16777215) {
-        this._value = null;
-        this._components = new Float32Array(4);
-        this._components.fill(1);
-        this._int = 16777215;
-        this.value = value;
-      }
-      /** Get red component (0 - 1) */
-      get red() {
-        return this._components[0];
-      }
-      /** Get green component (0 - 1) */
-      get green() {
-        return this._components[1];
-      }
-      /** Get blue component (0 - 1) */
-      get blue() {
-        return this._components[2];
-      }
-      /** Get alpha component (0 - 1) */
-      get alpha() {
-        return this._components[3];
+        return result;
       }
       /**
-       * Set the value, suitable for chaining
-       * @param value
-       * @see Color.value
+       * Set a value by key or keys name
+       * @param key - The key or keys to set
+       * @param value - The value to store in the cache or from which cacheable assets will be derived.
        */
-      setValue(value) {
-        this.value = value;
-        return this;
-      }
-      /**
-       * The current color source.
-       *
-       * When setting:
-       * - Setting to an instance of `Color` will copy its color source and components.
-       * - Otherwise, `Color` will try to normalize the color source and set the components.
-       *   If the color source is invalid, an `Error` will be thrown and the `Color` will left unchanged.
-       *
-       * Note: The `null` in the setter's parameter type is added to match the TypeScript rule: return type of getter
-       * must be assignable to its setter's parameter type. Setting `value` to `null` will throw an `Error`.
-       *
-       * When getting:
-       * - A return value of `null` means the previous value was overridden (e.g., {@link Color.multiply multiply},
-       *   {@link Color.premultiply premultiply} or {@link Color.round round}).
-       * - Otherwise, the color source used when setting is returned.
-       * @type {ColorSource}
-       */
-      set value(value) {
-        if (value instanceof _Color) {
-          this._value = this._cloneSource(value._value);
-          this._int = value._int;
-          this._components.set(value._components);
-        } else if (value === null) {
-          throw new Error("Cannot set Color#value to null");
-        } else if (this._value === null || !this._isSourceEqual(this._value, value)) {
-          this._normalize(value);
-          this._value = this._cloneSource(value);
-        }
-      }
-      get value() {
-        return this._value;
-      }
-      /**
-       * Copy a color source internally.
-       * @param value - Color source
-       */
-      _cloneSource(value) {
-        if (typeof value === "string" || typeof value === "number" || value instanceof Number || value === null) {
-          return value;
-        } else if (Array.isArray(value) || ArrayBuffer.isView(value)) {
-          return value.slice(0);
-        } else if (typeof value === "object" && value !== null) {
-          return __spreadValues$V({}, value);
-        }
-        return value;
-      }
-      /**
-       * Equality check for color sources.
-       * @param value1 - First color source
-       * @param value2 - Second color source
-       * @returns `true` if the color sources are equal, `false` otherwise.
-       */
-      _isSourceEqual(value1, value2) {
-        const type1 = typeof value1;
-        const type2 = typeof value2;
-        if (type1 !== type2) {
-          return false;
-        } else if (type1 === "number" || type1 === "string" || value1 instanceof Number) {
-          return value1 === value2;
-        } else if (Array.isArray(value1) && Array.isArray(value2) || ArrayBuffer.isView(value1) && ArrayBuffer.isView(value2)) {
-          if (value1.length !== value2.length) {
-            return false;
-          }
-          return value1.every((v, i) => v === value2[i]);
-        } else if (value1 !== null && value2 !== null) {
-          const keys1 = Object.keys(value1);
-          const keys2 = Object.keys(value2);
-          if (keys1.length !== keys2.length) {
-            return false;
-          }
-          return keys1.every((key) => value1[key] === value2[key]);
-        }
-        return value1 === value2;
-      }
-      /**
-       * Convert to a RGBA color object.
-       * @example
-       * import { Color } from 'pixi.js';
-       * new Color('white').toRgb(); // returns { r: 1, g: 1, b: 1, a: 1 }
-       */
-      toRgba() {
-        const [r, g, b, a] = this._components;
-        return { r, g, b, a };
-      }
-      /**
-       * Convert to a RGB color object.
-       * @example
-       * import { Color } from 'pixi.js';
-       * new Color('white').toRgb(); // returns { r: 1, g: 1, b: 1 }
-       */
-      toRgb() {
-        const [r, g, b] = this._components;
-        return { r, g, b };
-      }
-      /** Convert to a CSS-style rgba string: `rgba(255,255,255,1.0)`. */
-      toRgbaString() {
-        const [r, g, b] = this.toUint8RgbArray();
-        return `rgba(${r},${g},${b},${this.alpha})`;
-      }
-      toUint8RgbArray(out) {
-        const [r, g, b] = this._components;
-        if (!this._arrayRgb) {
-          this._arrayRgb = [];
-        }
-        out = out || this._arrayRgb;
-        out[0] = Math.round(r * 255);
-        out[1] = Math.round(g * 255);
-        out[2] = Math.round(b * 255);
-        return out;
-      }
-      toArray(out) {
-        if (!this._arrayRgba) {
-          this._arrayRgba = [];
-        }
-        out = out || this._arrayRgba;
-        const [r, g, b, a] = this._components;
-        out[0] = r;
-        out[1] = g;
-        out[2] = b;
-        out[3] = a;
-        return out;
-      }
-      toRgbArray(out) {
-        if (!this._arrayRgb) {
-          this._arrayRgb = [];
-        }
-        out = out || this._arrayRgb;
-        const [r, g, b] = this._components;
-        out[0] = r;
-        out[1] = g;
-        out[2] = b;
-        return out;
-      }
-      /**
-       * Convert to a hexadecimal number.
-       * @example
-       * import { Color } from 'pixi.js';
-       * new Color('white').toNumber(); // returns 16777215
-       */
-      toNumber() {
-        return this._int;
-      }
-      /**
-       * Convert to a BGR number
-       * @example
-       * import { Color } from 'pixi.js';
-       * new Color(0xffcc99).toBgrNumber(); // returns 0x99ccff
-       */
-      toBgrNumber() {
-        const [r, g, b] = this.toUint8RgbArray();
-        return (b << 16) + (g << 8) + r;
-      }
-      /**
-       * Convert to a hexadecimal number in little endian format (e.g., BBGGRR).
-       * @example
-       * import { Color } from 'pixi.js';
-       * new Color(0xffcc99).toLittleEndianNumber(); // returns 0x99ccff
-       * @returns {number} - The color as a number in little endian format.
-       */
-      toLittleEndianNumber() {
-        const value = this._int;
-        return (value >> 16) + (value & 65280) + ((value & 255) << 16);
-      }
-      /**
-       * Multiply with another color. This action is destructive, and will
-       * override the previous `value` property to be `null`.
-       * @param {ColorSource} value - The color to multiply by.
-       */
-      multiply(value) {
-        const [r, g, b, a] = _Color._temp.setValue(value)._components;
-        this._components[0] *= r;
-        this._components[1] *= g;
-        this._components[2] *= b;
-        this._components[3] *= a;
-        this._refreshInt();
-        this._value = null;
-        return this;
-      }
-      /**
-       * Converts color to a premultiplied alpha format. This action is destructive, and will
-       * override the previous `value` property to be `null`.
-       * @param alpha - The alpha to multiply by.
-       * @param {boolean} [applyToRGB=true] - Whether to premultiply RGB channels.
-       * @returns {Color} - Itself.
-       */
-      premultiply(alpha, applyToRGB = true) {
-        if (applyToRGB) {
-          this._components[0] *= alpha;
-          this._components[1] *= alpha;
-          this._components[2] *= alpha;
-        }
-        this._components[3] = alpha;
-        this._refreshInt();
-        this._value = null;
-        return this;
-      }
-      /**
-       * Premultiplies alpha with current color.
-       * @param {number} alpha - The alpha to multiply by.
-       * @param {boolean} [applyToRGB=true] - Whether to premultiply RGB channels.
-       * @returns {number} tint multiplied by alpha
-       */
-      toPremultiplied(alpha, applyToRGB = true) {
-        if (alpha === 1) {
-          return (255 << 24) + this._int;
-        }
-        if (alpha === 0) {
-          return applyToRGB ? 0 : this._int;
-        }
-        let r = this._int >> 16 & 255;
-        let g = this._int >> 8 & 255;
-        let b = this._int & 255;
-        if (applyToRGB) {
-          r = r * alpha + 0.5 | 0;
-          g = g * alpha + 0.5 | 0;
-          b = b * alpha + 0.5 | 0;
-        }
-        return (alpha * 255 << 24) + (r << 16) + (g << 8) + b;
-      }
-      /**
-       * Convert to a hexidecimal string.
-       * @example
-       * import { Color } from 'pixi.js';
-       * new Color('white').toHex(); // returns "#ffffff"
-       */
-      toHex() {
-        const hexString = this._int.toString(16);
-        return `#${"000000".substring(0, 6 - hexString.length) + hexString}`;
-      }
-      /**
-       * Convert to a hexidecimal string with alpha.
-       * @example
-       * import { Color } from 'pixi.js';
-       * new Color('white').toHexa(); // returns "#ffffffff"
-       */
-      toHexa() {
-        const alphaValue = Math.round(this._components[3] * 255);
-        const alphaString = alphaValue.toString(16);
-        return this.toHex() + "00".substring(0, 2 - alphaString.length) + alphaString;
-      }
-      /**
-       * Set alpha, suitable for chaining.
-       * @param alpha
-       */
-      setAlpha(alpha) {
-        this._components[3] = this._clamp(alpha);
-        return this;
-      }
-      /**
-       * Normalize the input value into rgba
-       * @param value - Input value
-       */
-      _normalize(value) {
-        let r;
-        let g;
-        let b;
-        let a;
-        if ((typeof value === "number" || value instanceof Number) && value >= 0 && value <= 16777215) {
-          const int = value;
-          r = (int >> 16 & 255) / 255;
-          g = (int >> 8 & 255) / 255;
-          b = (int & 255) / 255;
-          a = 1;
-        } else if ((Array.isArray(value) || value instanceof Float32Array) && value.length >= 3 && value.length <= 4) {
-          value = this._clamp(value);
-          [r, g, b, a = 1] = value;
-        } else if ((value instanceof Uint8Array || value instanceof Uint8ClampedArray) && value.length >= 3 && value.length <= 4) {
-          value = this._clamp(value, 0, 255);
-          [r, g, b, a = 255] = value;
-          r /= 255;
-          g /= 255;
-          b /= 255;
-          a /= 255;
-        } else if (typeof value === "string" || typeof value === "object") {
-          if (typeof value === "string") {
-            const match = _Color.HEX_PATTERN.exec(value);
-            if (match) {
-              value = `#${match[2]}`;
-            }
-          }
-          const color = w(value);
-          if (color.isValid()) {
-            ({ r, g, b, a } = color.rgba);
-            r /= 255;
-            g /= 255;
-            b /= 255;
+      set(key, value) {
+        const keys = convertToList(key);
+        let cacheableAssets;
+        for (let i = 0; i < this.parsers.length; i++) {
+          const parser = this.parsers[i];
+          if (parser.test(value)) {
+            cacheableAssets = parser.getCacheableAssets(keys, value);
+            break;
           }
         }
-        if (r !== void 0) {
-          this._components[0] = r;
-          this._components[1] = g;
-          this._components[2] = b;
-          this._components[3] = a;
-          this._refreshInt();
-        } else {
-          throw new Error(`Unable to convert color ${value}`);
+        const cacheableMap = new Map(Object.entries(cacheableAssets || {}));
+        if (!cacheableAssets) {
+          keys.forEach((key2) => {
+            cacheableMap.set(key2, value);
+          });
         }
-      }
-      /** Refresh the internal color rgb number */
-      _refreshInt() {
-        this._clamp(this._components);
-        const [r, g, b] = this._components;
-        this._int = (r * 255 << 16) + (g * 255 << 8) + (b * 255 | 0);
-      }
-      /**
-       * Clamps values to a range. Will override original values
-       * @param value - Value(s) to clamp
-       * @param min - Minimum value
-       * @param max - Maximum value
-       */
-      _clamp(value, min = 0, max = 1) {
-        if (typeof value === "number") {
-          return Math.min(Math.max(value, min), max);
-        }
-        value.forEach((v, i) => {
-          value[i] = Math.min(Math.max(v, min), max);
+        const cacheKeys = [...cacheableMap.keys()];
+        const cachedAssets = {
+          cacheKeys,
+          keys
+        };
+        keys.forEach((key2) => {
+          this._cacheMap.set(key2, cachedAssets);
         });
-        return value;
+        cacheKeys.forEach((key2) => {
+          const val = cacheableAssets ? cacheableAssets[key2] : value;
+          if (this._cache.has(key2) && this._cache.get(key2) !== val) {
+            warn("[Cache] already has key:", key2);
+          }
+          this._cache.set(key2, cacheableMap.get(key2));
+        });
       }
       /**
-       * Check if the value is a color-like object
-       * @param value - Value to check
-       * @returns True if the value is a color-like object
-       * @static
-       * @example
-       * import { Color } from 'pixi.js';
-       * Color.isColorLike('white'); // returns true
-       * Color.isColorLike(0xffffff); // returns true
-       * Color.isColorLike([1, 1, 1]); // returns true
+       * Remove entry by key
+       *
+       * This function will also remove any associated alias from the cache also.
+       * @param key - The key of the entry to remove
        */
-      static isColorLike(value) {
-        return typeof value === "number" || typeof value === "string" || value instanceof Number || value instanceof _Color || Array.isArray(value) || value instanceof Uint8Array || value instanceof Uint8ClampedArray || value instanceof Float32Array || value.r !== void 0 && value.g !== void 0 && value.b !== void 0 || value.r !== void 0 && value.g !== void 0 && value.b !== void 0 && value.a !== void 0 || value.h !== void 0 && value.s !== void 0 && value.l !== void 0 || value.h !== void 0 && value.s !== void 0 && value.l !== void 0 && value.a !== void 0 || value.h !== void 0 && value.s !== void 0 && value.v !== void 0 || value.h !== void 0 && value.s !== void 0 && value.v !== void 0 && value.a !== void 0;
+      remove(key) {
+        if (!this._cacheMap.has(key)) {
+          warn(`[Assets] Asset id ${key} was not found in the Cache`);
+          return;
+        }
+        const cacheMap = this._cacheMap.get(key);
+        const cacheKeys = cacheMap.cacheKeys;
+        cacheKeys.forEach((key2) => {
+          this._cache.delete(key2);
+        });
+        cacheMap.keys.forEach((key2) => {
+          this._cacheMap.delete(key2);
+        });
       }
-    };
-    /**
-     * Default Color object for static uses
-     * @example
-     * import { Color } from 'pixi.js';
-     * Color.shared.setValue(0xffffff).toHex(); // '#ffffff'
-     */
-    _Color.shared = new _Color();
-    /**
-     * Temporary Color object for static uses internally.
-     * As to not conflict with Color.shared.
-     * @ignore
-     */
-    _Color._temp = new _Color();
-    /** Pattern for hex strings */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    _Color.HEX_PATTERN = /^(#|0x)?(([a-f0-9]{3}){1,2}([a-f0-9]{2})?)$/i;
-    let Color = _Color;
-
-    "use strict";
-    const cullingMixin = {
-      cullArea: null,
-      cullable: false,
-      cullableChildren: true
-    };
+      /** All loader parsers registered */
+      get parsers() {
+        return this._parsers;
+      }
+    }
+    const Cache = new CacheClass();
 
     "use strict";
     const PI_2 = Math.PI * 2;
@@ -1483,6 +8137,1680 @@ var PIXI = (function (exports) {
     const identityMatrix = new Matrix();
 
     "use strict";
+    const ux = [1, 1, 0, -1, -1, -1, 0, 1, 1, 1, 0, -1, -1, -1, 0, 1];
+    const uy = [0, 1, 1, 1, 0, -1, -1, -1, 0, 1, 1, 1, 0, -1, -1, -1];
+    const vx = [0, -1, -1, -1, 0, 1, 1, 1, 0, 1, 1, 1, 0, -1, -1, -1];
+    const vy = [1, 1, 0, -1, -1, -1, 0, 1, -1, -1, 0, 1, 1, 1, 0, -1];
+    const rotationCayley = [];
+    const rotationMatrices = [];
+    const signum = Math.sign;
+    function init() {
+      for (let i = 0; i < 16; i++) {
+        const row = [];
+        rotationCayley.push(row);
+        for (let j = 0; j < 16; j++) {
+          const _ux = signum(ux[i] * ux[j] + vx[i] * uy[j]);
+          const _uy = signum(uy[i] * ux[j] + vy[i] * uy[j]);
+          const _vx = signum(ux[i] * vx[j] + vx[i] * vy[j]);
+          const _vy = signum(uy[i] * vx[j] + vy[i] * vy[j]);
+          for (let k = 0; k < 16; k++) {
+            if (ux[k] === _ux && uy[k] === _uy && vx[k] === _vx && vy[k] === _vy) {
+              row.push(k);
+              break;
+            }
+          }
+        }
+      }
+      for (let i = 0; i < 16; i++) {
+        const mat = new Matrix();
+        mat.set(ux[i], uy[i], vx[i], vy[i], 0, 0);
+        rotationMatrices.push(mat);
+      }
+    }
+    init();
+    const groupD8 = {
+      /**
+       * | Rotation | Direction |
+       * |----------|-----------|
+       * | 0°       | East      |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      E: 0,
+      /**
+       * | Rotation | Direction |
+       * |----------|-----------|
+       * | 45°↻     | Southeast |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      SE: 1,
+      /**
+       * | Rotation | Direction |
+       * |----------|-----------|
+       * | 90°↻     | South     |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      S: 2,
+      /**
+       * | Rotation | Direction |
+       * |----------|-----------|
+       * | 135°↻    | Southwest |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      SW: 3,
+      /**
+       * | Rotation | Direction |
+       * |----------|-----------|
+       * | 180°     | West      |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      W: 4,
+      /**
+       * | Rotation    | Direction    |
+       * |-------------|--------------|
+       * | -135°/225°↻ | Northwest    |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      NW: 5,
+      /**
+       * | Rotation    | Direction    |
+       * |-------------|--------------|
+       * | -90°/270°↻  | North        |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      N: 6,
+      /**
+       * | Rotation    | Direction    |
+       * |-------------|--------------|
+       * | -45°/315°↻  | Northeast    |
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      NE: 7,
+      /**
+       * Reflection about Y-axis.
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      MIRROR_VERTICAL: 8,
+      /**
+       * Reflection about the main diagonal.
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      MAIN_DIAGONAL: 10,
+      /**
+       * Reflection about X-axis.
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      MIRROR_HORIZONTAL: 12,
+      /**
+       * Reflection about reverse diagonal.
+       * @memberof maths.groupD8
+       * @constant {GD8Symmetry}
+       */
+      REVERSE_DIAGONAL: 14,
+      /**
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} ind - sprite rotation angle.
+       * @returns {GD8Symmetry} The X-component of the U-axis
+       *    after rotating the axes.
+       */
+      uX: (ind) => ux[ind],
+      /**
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} ind - sprite rotation angle.
+       * @returns {GD8Symmetry} The Y-component of the U-axis
+       *    after rotating the axes.
+       */
+      uY: (ind) => uy[ind],
+      /**
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} ind - sprite rotation angle.
+       * @returns {GD8Symmetry} The X-component of the V-axis
+       *    after rotating the axes.
+       */
+      vX: (ind) => vx[ind],
+      /**
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} ind - sprite rotation angle.
+       * @returns {GD8Symmetry} The Y-component of the V-axis
+       *    after rotating the axes.
+       */
+      vY: (ind) => vy[ind],
+      /**
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} rotation - symmetry whose opposite
+       *   is needed. Only rotations have opposite symmetries while
+       *   reflections don't.
+       * @returns {GD8Symmetry} The opposite symmetry of `rotation`
+       */
+      inv: (rotation) => {
+        if (rotation & 8) {
+          return rotation & 15;
+        }
+        return -rotation & 7;
+      },
+      /**
+       * Composes the two D8 operations.
+       *
+       * Taking `^` as reflection:
+       *
+       * |       | E=0 | S=2 | W=4 | N=6 | E^=8 | S^=10 | W^=12 | N^=14 |
+       * |-------|-----|-----|-----|-----|------|-------|-------|-------|
+       * | E=0   | E   | S   | W   | N   | E^   | S^    | W^    | N^    |
+       * | S=2   | S   | W   | N   | E   | S^   | W^    | N^    | E^    |
+       * | W=4   | W   | N   | E   | S   | W^   | N^    | E^    | S^    |
+       * | N=6   | N   | E   | S   | W   | N^   | E^    | S^    | W^    |
+       * | E^=8  | E^  | N^  | W^  | S^  | E    | N     | W     | S     |
+       * | S^=10 | S^  | E^  | N^  | W^  | S    | E     | N     | W     |
+       * | W^=12 | W^  | S^  | E^  | N^  | W    | S     | E     | N     |
+       * | N^=14 | N^  | W^  | S^  | E^  | N    | W     | S     | E     |
+       *
+       * [This is a Cayley table]{@link https://en.wikipedia.org/wiki/Cayley_table}
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} rotationSecond - Second operation, which
+       *   is the row in the above cayley table.
+       * @param {GD8Symmetry} rotationFirst - First operation, which
+       *   is the column in the above cayley table.
+       * @returns {GD8Symmetry} Composed operation
+       */
+      add: (rotationSecond, rotationFirst) => rotationCayley[rotationSecond][rotationFirst],
+      /**
+       * Reverse of `add`.
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} rotationSecond - Second operation
+       * @param {GD8Symmetry} rotationFirst - First operation
+       * @returns {GD8Symmetry} Result
+       */
+      sub: (rotationSecond, rotationFirst) => rotationCayley[rotationSecond][groupD8.inv(rotationFirst)],
+      /**
+       * Adds 180 degrees to rotation, which is a commutative
+       * operation.
+       * @memberof maths.groupD8
+       * @param {number} rotation - The number to rotate.
+       * @returns {number} Rotated number
+       */
+      rotate180: (rotation) => rotation ^ 4,
+      /**
+       * Checks if the rotation angle is vertical, i.e. south
+       * or north. It doesn't work for reflections.
+       * @memberof maths.groupD8
+       * @param {GD8Symmetry} rotation - The number to check.
+       * @returns {boolean} Whether or not the direction is vertical
+       */
+      isVertical: (rotation) => (rotation & 3) === 2,
+      // rotation % 4 === 2
+      /**
+       * Approximates the vector `V(dx,dy)` into one of the
+       * eight directions provided by `groupD8`.
+       * @memberof maths.groupD8
+       * @param {number} dx - X-component of the vector
+       * @param {number} dy - Y-component of the vector
+       * @returns {GD8Symmetry} Approximation of the vector into
+       *  one of the eight symmetries.
+       */
+      byDirection: (dx, dy) => {
+        if (Math.abs(dx) * 2 <= Math.abs(dy)) {
+          if (dy >= 0) {
+            return groupD8.S;
+          }
+          return groupD8.N;
+        } else if (Math.abs(dy) * 2 <= Math.abs(dx)) {
+          if (dx > 0) {
+            return groupD8.E;
+          }
+          return groupD8.W;
+        } else if (dy > 0) {
+          if (dx > 0) {
+            return groupD8.SE;
+          }
+          return groupD8.SW;
+        } else if (dx > 0) {
+          return groupD8.NE;
+        }
+        return groupD8.NW;
+      },
+      /**
+       * Helps sprite to compensate texture packer rotation.
+       * @memberof maths.groupD8
+       * @param {Matrix} matrix - sprite world matrix
+       * @param {GD8Symmetry} rotation - The rotation factor to use.
+       * @param {number} tx - sprite anchoring
+       * @param {number} ty - sprite anchoring
+       */
+      matrixAppendRotationInv: (matrix, rotation, tx = 0, ty = 0) => {
+        const mat = rotationMatrices[groupD8.inv(rotation)];
+        mat.tx = tx;
+        mat.ty = ty;
+        matrix.append(mat);
+      }
+    };
+
+    "use strict";
+    const tempPoints = [new Point(), new Point(), new Point(), new Point()];
+    class Rectangle {
+      /**
+       * @param x - The X coordinate of the upper-left corner of the rectangle
+       * @param y - The Y coordinate of the upper-left corner of the rectangle
+       * @param width - The overall width of the rectangle
+       * @param height - The overall height of the rectangle
+       */
+      constructor(x = 0, y = 0, width = 0, height = 0) {
+        /**
+         * The type of the object, mainly used to avoid `instanceof` checks
+         * @default 'rectangle'
+         */
+        this.type = "rectangle";
+        this.x = Number(x);
+        this.y = Number(y);
+        this.width = Number(width);
+        this.height = Number(height);
+      }
+      /** Returns the left edge of the rectangle. */
+      get left() {
+        return this.x;
+      }
+      /** Returns the right edge of the rectangle. */
+      get right() {
+        return this.x + this.width;
+      }
+      /** Returns the top edge of the rectangle. */
+      get top() {
+        return this.y;
+      }
+      /** Returns the bottom edge of the rectangle. */
+      get bottom() {
+        return this.y + this.height;
+      }
+      /** Determines whether the Rectangle is empty. */
+      isEmpty() {
+        return this.left === this.right || this.top === this.bottom;
+      }
+      /** A constant empty rectangle. This is a new object every time the property is accessed */
+      static get EMPTY() {
+        return new Rectangle(0, 0, 0, 0);
+      }
+      /**
+       * Creates a clone of this Rectangle
+       * @returns a copy of the rectangle
+       */
+      clone() {
+        return new Rectangle(this.x, this.y, this.width, this.height);
+      }
+      /**
+       * Converts a Bounds object to a Rectangle object.
+       * @param bounds - The bounds to copy and convert to a rectangle.
+       * @returns Returns itself.
+       */
+      copyFromBounds(bounds) {
+        this.x = bounds.minX;
+        this.y = bounds.minY;
+        this.width = bounds.maxX - bounds.minX;
+        this.height = bounds.maxY - bounds.minY;
+        return this;
+      }
+      /**
+       * Copies another rectangle to this one.
+       * @param rectangle - The rectangle to copy from.
+       * @returns Returns itself.
+       */
+      copyFrom(rectangle) {
+        this.x = rectangle.x;
+        this.y = rectangle.y;
+        this.width = rectangle.width;
+        this.height = rectangle.height;
+        return this;
+      }
+      /**
+       * Copies this rectangle to another one.
+       * @param rectangle - The rectangle to copy to.
+       * @returns Returns given parameter.
+       */
+      copyTo(rectangle) {
+        rectangle.copyFrom(this);
+        return rectangle;
+      }
+      /**
+       * Checks whether the x and y coordinates given are contained within this Rectangle
+       * @param x - The X coordinate of the point to test
+       * @param y - The Y coordinate of the point to test
+       * @returns Whether the x/y coordinates are within this Rectangle
+       */
+      contains(x, y) {
+        if (this.width <= 0 || this.height <= 0) {
+          return false;
+        }
+        if (x >= this.x && x < this.x + this.width) {
+          if (y >= this.y && y < this.y + this.height) {
+            return true;
+          }
+        }
+        return false;
+      }
+      strokeContains(x, y, strokeWidth) {
+        const { width, height } = this;
+        if (width <= 0 || height <= 0)
+          return false;
+        const _x = this.x;
+        const _y = this.y;
+        const outerLeft = _x - strokeWidth / 2;
+        const outerRight = _x + width + strokeWidth / 2;
+        const outerTop = _y - strokeWidth / 2;
+        const outerBottom = _y + height + strokeWidth / 2;
+        const innerLeft = _x + strokeWidth / 2;
+        const innerRight = _x + width - strokeWidth / 2;
+        const innerTop = _y + strokeWidth / 2;
+        const innerBottom = _y + height - strokeWidth / 2;
+        return x >= outerLeft && x <= outerRight && y >= outerTop && y <= outerBottom && !(x > innerLeft && x < innerRight && y > innerTop && y < innerBottom);
+      }
+      /**
+       * Determines whether the `other` Rectangle transformed by `transform` intersects with `this` Rectangle object.
+       * Returns true only if the area of the intersection is >0, this means that Rectangles
+       * sharing a side are not overlapping. Another side effect is that an arealess rectangle
+       * (width or height equal to zero) can't intersect any other rectangle.
+       * @param {Rectangle} other - The Rectangle to intersect with `this`.
+       * @param {Matrix} transform - The transformation matrix of `other`.
+       * @returns {boolean} A value of `true` if the transformed `other` Rectangle intersects with `this`; otherwise `false`.
+       */
+      intersects(other, transform) {
+        if (!transform) {
+          const x02 = this.x < other.x ? other.x : this.x;
+          const x12 = this.right > other.right ? other.right : this.right;
+          if (x12 <= x02) {
+            return false;
+          }
+          const y02 = this.y < other.y ? other.y : this.y;
+          const y12 = this.bottom > other.bottom ? other.bottom : this.bottom;
+          return y12 > y02;
+        }
+        const x0 = this.left;
+        const x1 = this.right;
+        const y0 = this.top;
+        const y1 = this.bottom;
+        if (x1 <= x0 || y1 <= y0) {
+          return false;
+        }
+        const lt = tempPoints[0].set(other.left, other.top);
+        const lb = tempPoints[1].set(other.left, other.bottom);
+        const rt = tempPoints[2].set(other.right, other.top);
+        const rb = tempPoints[3].set(other.right, other.bottom);
+        if (rt.x <= lt.x || lb.y <= lt.y) {
+          return false;
+        }
+        const s = Math.sign(transform.a * transform.d - transform.b * transform.c);
+        if (s === 0) {
+          return false;
+        }
+        transform.apply(lt, lt);
+        transform.apply(lb, lb);
+        transform.apply(rt, rt);
+        transform.apply(rb, rb);
+        if (Math.max(lt.x, lb.x, rt.x, rb.x) <= x0 || Math.min(lt.x, lb.x, rt.x, rb.x) >= x1 || Math.max(lt.y, lb.y, rt.y, rb.y) <= y0 || Math.min(lt.y, lb.y, rt.y, rb.y) >= y1) {
+          return false;
+        }
+        const nx = s * (lb.y - lt.y);
+        const ny = s * (lt.x - lb.x);
+        const n00 = nx * x0 + ny * y0;
+        const n10 = nx * x1 + ny * y0;
+        const n01 = nx * x0 + ny * y1;
+        const n11 = nx * x1 + ny * y1;
+        if (Math.max(n00, n10, n01, n11) <= nx * lt.x + ny * lt.y || Math.min(n00, n10, n01, n11) >= nx * rb.x + ny * rb.y) {
+          return false;
+        }
+        const mx = s * (lt.y - rt.y);
+        const my = s * (rt.x - lt.x);
+        const m00 = mx * x0 + my * y0;
+        const m10 = mx * x1 + my * y0;
+        const m01 = mx * x0 + my * y1;
+        const m11 = mx * x1 + my * y1;
+        if (Math.max(m00, m10, m01, m11) <= mx * lt.x + my * lt.y || Math.min(m00, m10, m01, m11) >= mx * rb.x + my * rb.y) {
+          return false;
+        }
+        return true;
+      }
+      /**
+       * Pads the rectangle making it grow in all directions.
+       * If paddingY is omitted, both paddingX and paddingY will be set to paddingX.
+       * @param paddingX - The horizontal padding amount.
+       * @param paddingY - The vertical padding amount.
+       * @returns Returns itself.
+       */
+      pad(paddingX = 0, paddingY = paddingX) {
+        this.x -= paddingX;
+        this.y -= paddingY;
+        this.width += paddingX * 2;
+        this.height += paddingY * 2;
+        return this;
+      }
+      /**
+       * Fits this rectangle around the passed one.
+       * @param rectangle - The rectangle to fit.
+       * @returns Returns itself.
+       */
+      fit(rectangle) {
+        const x1 = Math.max(this.x, rectangle.x);
+        const x2 = Math.min(this.x + this.width, rectangle.x + rectangle.width);
+        const y1 = Math.max(this.y, rectangle.y);
+        const y2 = Math.min(this.y + this.height, rectangle.y + rectangle.height);
+        this.x = x1;
+        this.width = Math.max(x2 - x1, 0);
+        this.y = y1;
+        this.height = Math.max(y2 - y1, 0);
+        return this;
+      }
+      /**
+       * Enlarges rectangle that way its corners lie on grid
+       * @param resolution - resolution
+       * @param eps - precision
+       * @returns Returns itself.
+       */
+      ceil(resolution = 1, eps = 1e-3) {
+        const x2 = Math.ceil((this.x + this.width - eps) * resolution) / resolution;
+        const y2 = Math.ceil((this.y + this.height - eps) * resolution) / resolution;
+        this.x = Math.floor((this.x + eps) * resolution) / resolution;
+        this.y = Math.floor((this.y + eps) * resolution) / resolution;
+        this.width = x2 - this.x;
+        this.height = y2 - this.y;
+        return this;
+      }
+      /**
+       * Enlarges this rectangle to include the passed rectangle.
+       * @param rectangle - The rectangle to include.
+       * @returns Returns itself.
+       */
+      enlarge(rectangle) {
+        const x1 = Math.min(this.x, rectangle.x);
+        const x2 = Math.max(this.x + this.width, rectangle.x + rectangle.width);
+        const y1 = Math.min(this.y, rectangle.y);
+        const y2 = Math.max(this.y + this.height, rectangle.y + rectangle.height);
+        this.x = x1;
+        this.width = x2 - x1;
+        this.y = y1;
+        this.height = y2 - y1;
+        return this;
+      }
+      /**
+       * Returns the framing rectangle of the rectangle as a Rectangle object
+       * @param out - optional rectangle to store the result
+       * @returns The framing rectangle
+       */
+      getBounds(out) {
+        out = out || new Rectangle();
+        out.copyFrom(this);
+        return out;
+      }
+      toString() {
+        return `[pixi.js/math:Rectangle x=${this.x} y=${this.y} width=${this.width} height=${this.height}]`;
+      }
+    }
+
+    "use strict";
+    const uidCache = {
+      default: -1
+    };
+    function uid(name = "default") {
+      if (uidCache[name] === void 0) {
+        uidCache[name] = -1;
+      }
+      return ++uidCache[name];
+    }
+
+    "use strict";
+    const warnings = {};
+    const v8_0_0 = "8.0.0";
+    function deprecation(version, message, ignoreDepth = 3) {
+      if (warnings[message]) {
+        return;
+      }
+      let stack = new Error().stack;
+      if (typeof stack === "undefined") {
+        console.warn("PixiJS Deprecation Warning: ", `${message}
+Deprecated since v${version}`);
+      } else {
+        stack = stack.split("\n").splice(ignoreDepth).join("\n");
+        if (console.groupCollapsed) {
+          console.groupCollapsed(
+            "%cPixiJS Deprecation Warning: %c%s",
+            "color:#614108;background:#fffbe6",
+            "font-weight:normal;color:#614108;background:#fffbe6",
+            `${message}
+Deprecated since v${version}`
+          );
+          console.warn(stack);
+          console.groupEnd();
+        } else {
+          console.warn("PixiJS Deprecation Warning: ", `${message}
+Deprecated since v${version}`);
+          console.warn(stack);
+        }
+      }
+      warnings[message] = true;
+    }
+
+    "use strict";
+    const NOOP = () => {
+    };
+
+    "use strict";
+    function nextPow2(v) {
+      v += v === 0 ? 1 : 0;
+      --v;
+      v |= v >>> 1;
+      v |= v >>> 2;
+      v |= v >>> 4;
+      v |= v >>> 8;
+      v |= v >>> 16;
+      return v + 1;
+    }
+    function isPow2(v) {
+      return !(v & v - 1) && !!v;
+    }
+    function log2(v) {
+      let r = (v > 65535 ? 1 : 0) << 4;
+      v >>>= r;
+      let shift = (v > 255 ? 1 : 0) << 3;
+      v >>>= shift;
+      r |= shift;
+      shift = (v > 15 ? 1 : 0) << 2;
+      v >>>= shift;
+      r |= shift;
+      shift = (v > 3 ? 1 : 0) << 1;
+      v >>>= shift;
+      r |= shift;
+      return r | v >> 1;
+    }
+
+    "use strict";
+    function definedProps(obj) {
+      const result = {};
+      for (const key in obj) {
+        if (obj[key] !== void 0) {
+          result[key] = obj[key];
+        }
+      }
+      return result;
+    }
+
+    "use strict";
+    const idCounts = /* @__PURE__ */ Object.create(null);
+    const idHash = /* @__PURE__ */ Object.create(null);
+    function createIdFromString(value, groupId) {
+      let id = idHash[value];
+      if (id === void 0) {
+        if (idCounts[groupId] === void 0) {
+          idCounts[groupId] = 1;
+        }
+        idHash[value] = id = idCounts[groupId]++;
+      }
+      return id;
+    }
+
+    "use strict";
+    var __defProp$T = Object.defineProperty;
+    var __getOwnPropSymbols$T = Object.getOwnPropertySymbols;
+    var __hasOwnProp$T = Object.prototype.hasOwnProperty;
+    var __propIsEnum$T = Object.prototype.propertyIsEnumerable;
+    var __defNormalProp$T = (obj, key, value) => key in obj ? __defProp$T(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    var __spreadValues$T = (a, b) => {
+      for (var prop in b || (b = {}))
+        if (__hasOwnProp$T.call(b, prop))
+          __defNormalProp$T(a, prop, b[prop]);
+      if (__getOwnPropSymbols$T)
+        for (var prop of __getOwnPropSymbols$T(b)) {
+          if (__propIsEnum$T.call(b, prop))
+            __defNormalProp$T(a, prop, b[prop]);
+        }
+      return a;
+    };
+    const _TextureStyle = class _TextureStyle extends EventEmitter {
+      constructor(options = {}) {
+        var _a, _b, _c, _d, _e, _f, _g;
+        super();
+        this._resourceType = "textureSampler";
+        this._touched = 0;
+        /**
+         * Specifies the maximum anisotropy value clamp used by the sampler.
+         * Note: Most implementations support {@link GPUSamplerDescriptor#maxAnisotropy} values in range
+         * between 1 and 16, inclusive. The used value of {@link GPUSamplerDescriptor#maxAnisotropy} will
+         * be clamped to the maximum value that the platform supports.
+         * @internal
+         */
+        this._maxAnisotropy = 1;
+        options = __spreadValues$T(__spreadValues$T({}, _TextureStyle.defaultOptions), options);
+        this.addressMode = options.addressMode;
+        this.addressModeU = (_a = options.addressModeU) != null ? _a : this.addressModeU;
+        this.addressModeV = (_b = options.addressModeV) != null ? _b : this.addressModeV;
+        this.addressModeW = (_c = options.addressModeW) != null ? _c : this.addressModeW;
+        this.scaleMode = options.scaleMode;
+        this.magFilter = (_d = options.magFilter) != null ? _d : this.magFilter;
+        this.minFilter = (_e = options.minFilter) != null ? _e : this.minFilter;
+        this.mipmapFilter = (_f = options.mipmapFilter) != null ? _f : this.mipmapFilter;
+        this.lodMinClamp = options.lodMinClamp;
+        this.lodMaxClamp = options.lodMaxClamp;
+        this.compare = options.compare;
+        this.maxAnisotropy = (_g = options.maxAnisotropy) != null ? _g : 1;
+      }
+      set addressMode(value) {
+        this.addressModeU = value;
+        this.addressModeV = value;
+        this.addressModeW = value;
+      }
+      get addressMode() {
+        return this.addressModeU;
+      }
+      set wrapMode(value) {
+        deprecation("8", "TextureStyle.wrapMode is now TextureStyle.addressMode");
+        this.addressMode = value;
+      }
+      get wrapMode() {
+        return this.addressMode;
+      }
+      set scaleMode(value) {
+        this.magFilter = value;
+        this.minFilter = value;
+        this.mipmapFilter = value;
+      }
+      get scaleMode() {
+        return this.magFilter;
+      }
+      set maxAnisotropy(value) {
+        this._maxAnisotropy = Math.min(value, 16);
+        if (this._maxAnisotropy > 1) {
+          this.scaleMode = "linear";
+        }
+      }
+      get maxAnisotropy() {
+        return this._maxAnisotropy;
+      }
+      // TODO - move this to WebGL?
+      get _resourceId() {
+        return this._sharedResourceId || this._generateResourceId();
+      }
+      update() {
+        this.emit("change", this);
+        this._sharedResourceId = null;
+      }
+      _generateResourceId() {
+        const bigKey = `${this.addressModeU}-${this.addressModeV}-${this.addressModeW}-${this.magFilter}-${this.minFilter}-${this.mipmapFilter}-${this.lodMinClamp}-${this.lodMaxClamp}-${this.compare}-${this._maxAnisotropy}`;
+        this._sharedResourceId = createIdFromString(bigKey, "sampler");
+        return this._resourceId;
+      }
+      /** Destroys the style */
+      destroy() {
+        this.emit("destroy", this);
+        this.removeAllListeners();
+      }
+    };
+    // override to set styles globally
+    _TextureStyle.defaultOptions = {
+      addressMode: "clamp-to-edge",
+      scaleMode: "linear"
+    };
+    let TextureStyle = _TextureStyle;
+
+    "use strict";
+    var __defProp$S = Object.defineProperty;
+    var __getOwnPropSymbols$S = Object.getOwnPropertySymbols;
+    var __hasOwnProp$S = Object.prototype.hasOwnProperty;
+    var __propIsEnum$S = Object.prototype.propertyIsEnumerable;
+    var __defNormalProp$S = (obj, key, value) => key in obj ? __defProp$S(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    var __spreadValues$S = (a, b) => {
+      for (var prop in b || (b = {}))
+        if (__hasOwnProp$S.call(b, prop))
+          __defNormalProp$S(a, prop, b[prop]);
+      if (__getOwnPropSymbols$S)
+        for (var prop of __getOwnPropSymbols$S(b)) {
+          if (__propIsEnum$S.call(b, prop))
+            __defNormalProp$S(a, prop, b[prop]);
+        }
+      return a;
+    };
+    const _TextureSource = class _TextureSource extends EventEmitter {
+      constructor(options = {}) {
+        var _a, _b, _c;
+        super();
+        this.options = options;
+        /** unique id for this Texture source */
+        this.uid = uid("textureSource");
+        /** optional label, can be used for debugging */
+        this.label = "";
+        /**
+         * The resource type used by this TextureSource. This is used by the bind groups to determine
+         * how to handle this resource.
+         * @ignore
+         * @internal
+         */
+        this._resourceType = "textureSource";
+        /**
+         * i unique resource id, used by the bind group systems.
+         * This can change if the texture is resized or its resource changes
+         */
+        this._resourceId = uid("textureResource");
+        /**
+         * this is how the backends know how to upload this texture to the GPU
+         * It changes depending on the resource type. Classes that extend TextureSource
+         * should override this property.
+         * @ignore
+         * @internal
+         */
+        this.uploadMethodId = "unknown";
+        // dimensions
+        /** @internal */
+        this._resolution = 1;
+        /** the pixel width of this texture source. This is the REAL pure number, not accounting resolution */
+        this.pixelWidth = 1;
+        /** the pixel height of this texture source. This is the REAL pure number, not accounting resolution */
+        this.pixelHeight = 1;
+        /**
+         * the width of this texture source, accounting for resolution
+         * eg pixelWidth 200, resolution 2, then width will be 100
+         */
+        this.width = 1;
+        /**
+         * the height of this texture source, accounting for resolution
+         * eg pixelHeight 200, resolution 2, then height will be 100
+         */
+        this.height = 1;
+        /**
+         * The number of samples of a multisample texture. This is always 1 for non-multisample textures.
+         * To enable multisample for a texture, set antialias to true
+         * @internal
+         * @ignore
+         */
+        this.sampleCount = 1;
+        /** The number of mip levels to generate for this texture. this is  overridden if autoGenerateMipmaps is true */
+        this.mipLevelCount = 1;
+        /**
+         * Should we auto generate mipmaps for this texture? This will automatically generate mipmaps
+         * for this texture when uploading to the GPU. Mipmapped textures take up more memory, but
+         * can look better when scaled down.
+         *
+         * For performance reasons, it is recommended to NOT use this with RenderTextures, as they are often updated every frame.
+         * If you do, make sure to call `updateMipmaps` after you update the texture.
+         */
+        this.autoGenerateMipmaps = false;
+        /** the format that the texture data has */
+        this.format = "rgba8unorm";
+        /** how many dimensions does this texture have? currently v8 only supports 2d */
+        this.dimension = "2d";
+        /**
+         * Only really affects RenderTextures.
+         * Should we use antialiasing for this texture. It will look better, but may impact performance as a
+         * Blit operation will be required to resolve the texture.
+         */
+        this.antialias = false;
+        /** Should we use a depth stencil texture for this texture. This is only used when rendering to a texture. */
+        this.depthStencil = true;
+        /**
+         * Used by automatic texture Garbage Collection, stores last GC tick when it was bound
+         * @protected
+         */
+        this._touched = 0;
+        /**
+         * Used by the batcher to build texture batches. faster to have the variable here!
+         * @protected
+         */
+        this._batchTick = -1;
+        /**
+         * A temporary batch location for the texture batching. Here for performance reasons only!
+         * @protected
+         */
+        this._textureBindLocation = -1;
+        options = __spreadValues$S(__spreadValues$S({}, _TextureSource.defaultOptions), options);
+        (_a = this.label) != null ? _a : this.label = options.label;
+        this.resource = options.resource;
+        this._resolution = options.resolution;
+        if (options.width) {
+          this.pixelWidth = options.width * this._resolution;
+        } else {
+          this.pixelWidth = this.resource ? (_b = this.resourceWidth) != null ? _b : 1 : 1;
+        }
+        if (options.height) {
+          this.pixelHeight = options.height * this._resolution;
+        } else {
+          this.pixelHeight = this.resource ? (_c = this.resourceHeight) != null ? _c : 1 : 1;
+        }
+        this.width = this.pixelWidth / this._resolution;
+        this.height = this.pixelHeight / this._resolution;
+        this.format = options.format;
+        this.dimension = options.dimensions;
+        this.mipLevelCount = options.mipLevelCount;
+        this.autoGenerateMipmaps = options.autoGenerateMipmaps;
+        this.sampleCount = options.sampleCount;
+        this.antialias = options.antialias;
+        this.alphaMode = options.alphaMode;
+        this.style = new TextureStyle(definedProps(options));
+        this.destroyed = false;
+        this._refreshPOT();
+      }
+      /** returns itself */
+      get source() {
+        return this;
+      }
+      /** the style of the texture */
+      get style() {
+        return this._style;
+      }
+      set style(value) {
+        var _a, _b;
+        if (this.style === value)
+          return;
+        (_a = this._style) == null ? void 0 : _a.off("change", this._onStyleChange, this);
+        this._style = value;
+        (_b = this._style) == null ? void 0 : _b.on("change", this._onStyleChange, this);
+        this._onStyleChange();
+      }
+      get addressMode() {
+        return this._style.addressMode;
+      }
+      set addressMode(value) {
+        this._style.addressMode = value;
+      }
+      get repeatMode() {
+        return this._style.addressMode;
+      }
+      set repeatMode(value) {
+        this._style.addressMode = value;
+      }
+      get magFilter() {
+        return this._style.magFilter;
+      }
+      set magFilter(value) {
+        this._style.magFilter = value;
+      }
+      get minFilter() {
+        return this._style.minFilter;
+      }
+      set minFilter(value) {
+        this._style.minFilter = value;
+      }
+      get mipmapFilter() {
+        return this._style.mipmapFilter;
+      }
+      set mipmapFilter(value) {
+        this._style.mipmapFilter = value;
+      }
+      get lodMinClamp() {
+        return this._style.lodMinClamp;
+      }
+      set lodMinClamp(value) {
+        this._style.lodMinClamp = value;
+      }
+      get lodMaxClamp() {
+        return this._style.lodMaxClamp;
+      }
+      set lodMaxClamp(value) {
+        this._style.lodMaxClamp = value;
+      }
+      _onStyleChange() {
+        this.emit("styleChange", this);
+      }
+      /** call this if you have modified the texture outside of the constructor */
+      update() {
+        this.emit("update", this);
+      }
+      /** Destroys this texture source */
+      destroy() {
+        this.destroyed = true;
+        this.emit("destroy", this);
+        if (this._style) {
+          this._style.destroy();
+          this._style = null;
+        }
+        this.uploadMethodId = null;
+        this.resource = null;
+        this.removeAllListeners();
+      }
+      /**
+       * This will unload the Texture source from the GPU. This will free up the GPU memory
+       * As soon as it is required fore rendering, it will be re-uploaded.
+       */
+      unload() {
+        this._resourceId++;
+        this.emit("change", this);
+        this.emit("unload", this);
+      }
+      /** the width of the resource. This is the REAL pure number, not accounting resolution   */
+      get resourceWidth() {
+        const { resource } = this;
+        return resource.naturalWidth || resource.videoWidth || resource.displayWidth || resource.width;
+      }
+      /** the height of the resource. This is the REAL pure number, not accounting resolution */
+      get resourceHeight() {
+        const { resource } = this;
+        return resource.naturalHeight || resource.videoHeight || resource.displayHeight || resource.height;
+      }
+      /**
+       * the resolution of the texture. Changing this number, will not change the number of pixels in the actual texture
+       * but will the size of the texture when rendered.
+       *
+       * changing the resolution of this texture to 2 for example will make it appear twice as small when rendered (as pixel
+       * density will have increased)
+       */
+      get resolution() {
+        return this._resolution;
+      }
+      set resolution(resolution) {
+        if (this._resolution === resolution)
+          return;
+        this._resolution = resolution;
+        this.width = this.pixelWidth / resolution;
+        this.height = this.pixelHeight / resolution;
+      }
+      /**
+       * Resize the texture, this is handy if you want to use the texture as a render texture
+       * @param width - the new width of the texture
+       * @param height - the new height of the texture
+       * @param resolution - the new resolution of the texture
+       */
+      resize(width, height, resolution) {
+        resolution = resolution || this._resolution;
+        width = width || this.width;
+        height = height || this.height;
+        const newPixelWidth = Math.round(width * resolution);
+        const newPixelHeight = Math.round(height * resolution);
+        this.width = newPixelWidth / resolution;
+        this.height = newPixelHeight / resolution;
+        this._resolution = resolution;
+        if (this.pixelWidth === newPixelWidth && this.pixelHeight === newPixelHeight) {
+          return;
+        }
+        this._refreshPOT();
+        this.pixelWidth = newPixelWidth;
+        this.pixelHeight = newPixelHeight;
+        this.emit("resize", this);
+        this._resourceId++;
+        this.emit("change", this);
+      }
+      /**
+       * Lets the renderer know that this texture has been updated and its mipmaps should be re-generated.
+       * This is only important for RenderTexture instances, as standard Texture instances will have their
+       * mipmaps generated on upload. You should call this method after you make any change to the texture
+       *
+       * The reason for this is is can be quite expensive to update mipmaps for a texture. So by default,
+       * We want you, the developer to specify when this action should happen.
+       *
+       * Generally you don't want to have mipmaps generated on Render targets that are changed every frame,
+       */
+      updateMipmaps() {
+        if (this.autoGenerateMipmaps && this.mipLevelCount > 1) {
+          this.emit("updateMipmaps", this);
+        }
+      }
+      set wrapMode(value) {
+        this._style.wrapMode = value;
+      }
+      get wrapMode() {
+        return this._style.wrapMode;
+      }
+      set scaleMode(value) {
+        this._style.scaleMode = value;
+      }
+      get scaleMode() {
+        return this._style.scaleMode;
+      }
+      /**
+       * Refresh check for isPowerOfTwo texture based on size
+       * @private
+       */
+      _refreshPOT() {
+        this.isPowerOfTwo = isPow2(this.pixelWidth) && isPow2(this.pixelHeight);
+      }
+      static test(_resource) {
+        throw new Error("Unimplemented");
+      }
+    };
+    /** The default options used when creating a new TextureSource. override these to add your own defaults */
+    _TextureSource.defaultOptions = {
+      resolution: 1,
+      format: "bgra8unorm",
+      alphaMode: "premultiply-alpha-on-upload",
+      dimensions: "2d",
+      mipLevelCount: 1,
+      autoGenerateMipmaps: false,
+      sampleCount: 1,
+      antialias: false
+    };
+    let TextureSource = _TextureSource;
+
+    "use strict";
+    var __defProp$R = Object.defineProperty;
+    var __defProps$h = Object.defineProperties;
+    var __getOwnPropDescs$h = Object.getOwnPropertyDescriptors;
+    var __getOwnPropSymbols$R = Object.getOwnPropertySymbols;
+    var __hasOwnProp$R = Object.prototype.hasOwnProperty;
+    var __propIsEnum$R = Object.prototype.propertyIsEnumerable;
+    var __defNormalProp$R = (obj, key, value) => key in obj ? __defProp$R(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    var __spreadValues$R = (a, b) => {
+      for (var prop in b || (b = {}))
+        if (__hasOwnProp$R.call(b, prop))
+          __defNormalProp$R(a, prop, b[prop]);
+      if (__getOwnPropSymbols$R)
+        for (var prop of __getOwnPropSymbols$R(b)) {
+          if (__propIsEnum$R.call(b, prop))
+            __defNormalProp$R(a, prop, b[prop]);
+        }
+      return a;
+    };
+    var __spreadProps$h = (a, b) => __defProps$h(a, __getOwnPropDescs$h(b));
+    class BufferImageSource extends TextureSource {
+      constructor(options) {
+        const buffer = options.resource || new Float32Array(options.width * options.height * 4);
+        let format = options.format;
+        if (!format) {
+          if (buffer instanceof Float32Array) {
+            format = "rgba32float";
+          } else if (buffer instanceof Int32Array) {
+            format = "rgba32uint";
+          } else if (buffer instanceof Uint32Array) {
+            format = "rgba32uint";
+          } else if (buffer instanceof Int16Array) {
+            format = "rgba16uint";
+          } else if (buffer instanceof Uint16Array) {
+            format = "rgba16uint";
+          } else if (buffer instanceof Int8Array) {
+            format = "bgra8unorm";
+          } else {
+            format = "bgra8unorm";
+          }
+        }
+        super(__spreadProps$h(__spreadValues$R({}, options), {
+          resource: buffer,
+          format
+        }));
+        this.uploadMethodId = "buffer";
+      }
+      static test(resource) {
+        return resource instanceof Int8Array || resource instanceof Uint8Array || resource instanceof Uint8ClampedArray || resource instanceof Int16Array || resource instanceof Uint16Array || resource instanceof Int32Array || resource instanceof Uint32Array || resource instanceof Float32Array;
+      }
+    }
+    BufferImageSource.extension = ExtensionType.TextureSource;
+
+    "use strict";
+    const sources = [];
+    extensions.handleByList(ExtensionType.TextureSource, sources);
+    function autoDetectSource(options = {}) {
+      for (let i = 0; i < sources.length; i++) {
+        const Source = sources[i];
+        if (Source.test(options.resource)) {
+          return new Source(options);
+        }
+      }
+      throw new Error(`Could not find a source type for resource: ${options.resource}`);
+    }
+    function resourceToTexture(options = {}, skipCache = false) {
+      const { resource } = options;
+      if (!skipCache && Cache.has(resource)) {
+        return Cache.get(resource);
+      }
+      const texture = new Texture({ source: autoDetectSource(options) });
+      texture.on("destroy", () => {
+        if (Cache.has(resource)) {
+          Cache.remove(resource);
+        }
+      });
+      if (!skipCache) {
+        Cache.set(resource, texture);
+      }
+      return texture;
+    }
+
+    "use strict";
+    const tempMat = new Matrix();
+    class TextureMatrix {
+      /**
+       * @param texture - observed texture
+       * @param clampMargin - Changes frame clamping, 0.5 by default. Use -0.5 for extra border.
+       */
+      constructor(texture, clampMargin) {
+        this.mapCoord = new Matrix();
+        this.uClampFrame = new Float32Array(4);
+        this.uClampOffset = new Float32Array(2);
+        this._textureID = -1;
+        this._updateID = 0;
+        this.clampOffset = 0;
+        if (typeof clampMargin === "undefined") {
+          this.clampMargin = texture.width < 10 ? 0 : 0.5;
+        } else {
+          this.clampMargin = clampMargin;
+        }
+        this.isSimple = false;
+        this.texture = texture;
+      }
+      /** Texture property. */
+      get texture() {
+        return this._texture;
+      }
+      set texture(value) {
+        var _a;
+        if (this.texture === value)
+          return;
+        (_a = this._texture) == null ? void 0 : _a.removeListener("update", this.update, this);
+        this._texture = value;
+        this._texture.addListener("update", this.update, this);
+        this.update();
+      }
+      /**
+       * Multiplies uvs array to transform
+       * @param uvs - mesh uvs
+       * @param [out=uvs] - output
+       * @returns - output
+       */
+      multiplyUvs(uvs, out) {
+        if (out === void 0) {
+          out = uvs;
+        }
+        const mat = this.mapCoord;
+        for (let i = 0; i < uvs.length; i += 2) {
+          const x = uvs[i];
+          const y = uvs[i + 1];
+          out[i] = x * mat.a + y * mat.c + mat.tx;
+          out[i + 1] = x * mat.b + y * mat.d + mat.ty;
+        }
+        return out;
+      }
+      update() {
+        const tex = this._texture;
+        this._updateID++;
+        const uvs = tex.uvs;
+        this.mapCoord.set(uvs.x1 - uvs.x0, uvs.y1 - uvs.y0, uvs.x3 - uvs.x0, uvs.y3 - uvs.y0, uvs.x0, uvs.y0);
+        const orig = tex.orig;
+        const trim = tex.trim;
+        if (trim) {
+          tempMat.set(
+            orig.width / trim.width,
+            0,
+            0,
+            orig.height / trim.height,
+            -trim.x / trim.width,
+            -trim.y / trim.height
+          );
+          this.mapCoord.append(tempMat);
+        }
+        const texBase = tex.source;
+        const frame = this.uClampFrame;
+        const margin = this.clampMargin / texBase._resolution;
+        const offset = this.clampOffset;
+        frame[0] = (tex.frame.x + margin + offset) / texBase.width;
+        frame[1] = (tex.frame.y + margin + offset) / texBase.height;
+        frame[2] = (tex.frame.x + tex.frame.width - margin + offset) / texBase.width;
+        frame[3] = (tex.frame.y + tex.frame.height - margin + offset) / texBase.height;
+        this.uClampOffset[0] = offset / texBase.pixelWidth;
+        this.uClampOffset[1] = offset / texBase.pixelHeight;
+        this.isSimple = tex.frame.width === texBase.width && tex.frame.height === texBase.height && tex.rotate === 0;
+        return true;
+      }
+    }
+
+    "use strict";
+    class Texture extends EventEmitter {
+      constructor({
+        source,
+        label,
+        frame,
+        orig,
+        trim,
+        defaultAnchor,
+        defaultBorders,
+        rotate
+      } = {}) {
+        var _a;
+        super();
+        /** unique id for this texture */
+        this.uid = uid("texture");
+        /** A uvs object based on the given frame and the texture source */
+        this.uvs = { x0: 0, y0: 0, x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 };
+        /**
+         * This is the area of the BaseTexture image to actually copy to the Canvas / WebGL when rendering,
+         * irrespective of the actual frame size or placement (which can be influenced by trimmed texture atlases)
+         */
+        this.frame = new Rectangle();
+        /**
+         * Does this Texture have any frame data assigned to it?
+         *
+         * This mode is enabled automatically if no frame was passed inside constructor.
+         *
+         * In this mode texture is subscribed to baseTexture events, and fires `update` on any change.
+         *
+         * Beware, after loading or resize of baseTexture event can fired two times!
+         * If you want more control, subscribe on baseTexture itself.
+         * @example
+         * texture.on('update', () => {});
+         */
+        this.noFrame = false;
+        this.label = label;
+        this.source = (_a = source == null ? void 0 : source.source) != null ? _a : new TextureSource();
+        this.noFrame = !frame;
+        if (frame) {
+          this.frame.copyFrom(frame);
+        } else {
+          const { width, height } = this._source;
+          this.frame.width = width;
+          this.frame.height = height;
+        }
+        this.orig = orig || this.frame;
+        this.trim = trim;
+        this.rotate = rotate != null ? rotate : 0;
+        this.defaultAnchor = defaultAnchor;
+        this.defaultBorders = defaultBorders;
+        this.destroyed = false;
+        this.updateUvs();
+      }
+      /**
+       * Helper function that creates a returns Texture based on the source you provide.
+       * The source should be loaded and ready to go. If not its best to grab the asset using Assets.
+       * @param id - String or Source to create texture from
+       * @param skipCache - Skip adding the texture to the cache
+       * @returns The texture based on the Id provided
+       */
+      static from(id, skipCache = false) {
+        if (typeof id === "string") {
+          return Cache.get(id);
+        } else if (id instanceof TextureSource) {
+          return new Texture({ source: id });
+        }
+        return resourceToTexture(id, skipCache);
+      }
+      set source(value) {
+        if (this._source) {
+          this._source.off("resize", this.onUpdate, this);
+        }
+        this._source = value;
+        value.on("resize", this.onUpdate, this);
+        this.emit("update", this);
+      }
+      /** the underlying source of the texture (equivalent of baseTexture in v7) */
+      get source() {
+        return this._source;
+      }
+      /** returns a TextureMatrix instance for this texture. By default, that object is not created because its heavy. */
+      get textureMatrix() {
+        if (!this._textureMatrix) {
+          this._textureMatrix = new TextureMatrix(this);
+        }
+        return this._textureMatrix;
+      }
+      /** The width of the Texture in pixels. */
+      get width() {
+        return this.orig.width;
+      }
+      /** The height of the Texture in pixels. */
+      get height() {
+        return this.orig.height;
+      }
+      /** Call this function when you have modified the frame of this texture. */
+      updateUvs() {
+        const { uvs, frame } = this;
+        const { width, height } = this._source;
+        const nX = frame.x / width;
+        const nY = frame.y / height;
+        const nW = frame.width / width;
+        const nH = frame.height / height;
+        let rotate = this.rotate;
+        if (rotate) {
+          const w2 = nW / 2;
+          const h2 = nH / 2;
+          const cX = nX + w2;
+          const cY = nY + h2;
+          rotate = groupD8.add(rotate, groupD8.NW);
+          uvs.x0 = cX + w2 * groupD8.uX(rotate);
+          uvs.y0 = cY + h2 * groupD8.uY(rotate);
+          rotate = groupD8.add(rotate, 2);
+          uvs.x1 = cX + w2 * groupD8.uX(rotate);
+          uvs.y1 = cY + h2 * groupD8.uY(rotate);
+          rotate = groupD8.add(rotate, 2);
+          uvs.x2 = cX + w2 * groupD8.uX(rotate);
+          uvs.y2 = cY + h2 * groupD8.uY(rotate);
+          rotate = groupD8.add(rotate, 2);
+          uvs.x3 = cX + w2 * groupD8.uX(rotate);
+          uvs.y3 = cY + h2 * groupD8.uY(rotate);
+        } else {
+          uvs.x0 = nX;
+          uvs.y0 = nY;
+          uvs.x1 = nX + nW;
+          uvs.y1 = nY;
+          uvs.x2 = nX + nW;
+          uvs.y2 = nY + nH;
+          uvs.x3 = nX;
+          uvs.y3 = nY + nH;
+        }
+      }
+      /**
+       * Destroys this texture
+       * @param destroySource - Destroy the source when the texture is destroyed.
+       */
+      destroy(destroySource = false) {
+        if (this._source) {
+          if (destroySource) {
+            this._source.destroy();
+            this._source = null;
+          }
+        }
+        this._textureMatrix = null;
+        this.destroyed = true;
+        this.emit("destroy", this);
+        this.removeAllListeners();
+      }
+      /**
+       * @internal
+       */
+      onUpdate() {
+        if (this.noFrame) {
+          this.frame.width = this._source.width;
+          this.frame.height = this._source.height;
+        }
+        this.updateUvs();
+        this.emit("update", this);
+      }
+      /** @deprecated since 8.0.0 */
+      get baseTexture() {
+        deprecation(v8_0_0, "Texture.baseTexture is now Texture.source");
+        return this._source;
+      }
+    }
+    Texture.EMPTY = new Texture({
+      label: "EMPTY"
+    });
+    Texture.EMPTY.destroy = NOOP;
+    Texture.WHITE = new Texture({
+      source: new BufferImageSource({
+        resource: new Uint8Array([255, 255, 255, 255]),
+        width: 1,
+        height: 1,
+        alphaMode: "premultiply-alpha-on-upload"
+      }),
+      label: "WHITE"
+    });
+    Texture.WHITE.destroy = NOOP;
+
+    "use strict";
+    const _Spritesheet = class _Spritesheet {
+      /**
+       * @param texture - Reference to the source BaseTexture object.
+       * @param {object} data - Spritesheet image data.
+       */
+      constructor(texture, data) {
+        /** For multi-packed spritesheets, this contains a reference to all the other spritesheets it depends on. */
+        this.linkedSheets = [];
+        this._texture = texture instanceof Texture ? texture : null;
+        this.textureSource = texture.source;
+        this.textures = {};
+        this.animations = {};
+        this.data = data;
+        const metaResolution = parseFloat(data.meta.scale);
+        if (metaResolution) {
+          this.resolution = metaResolution;
+          texture.source.resolution = this.resolution;
+        } else {
+          this.resolution = texture.source._resolution;
+        }
+        this._frames = this.data.frames;
+        this._frameKeys = Object.keys(this._frames);
+        this._batchIndex = 0;
+        this._callback = null;
+      }
+      /**
+       * Parser spritesheet from loaded data. This is done asynchronously
+       * to prevent creating too many Texture within a single process.
+       */
+      parse() {
+        return new Promise((resolve) => {
+          this._callback = resolve;
+          this._batchIndex = 0;
+          if (this._frameKeys.length <= _Spritesheet.BATCH_SIZE) {
+            this._processFrames(0);
+            this._processAnimations();
+            this._parseComplete();
+          } else {
+            this._nextBatch();
+          }
+        });
+      }
+      /**
+       * Process a batch of frames
+       * @param initialFrameIndex - The index of frame to start.
+       */
+      _processFrames(initialFrameIndex) {
+        let frameIndex = initialFrameIndex;
+        const maxFrames = _Spritesheet.BATCH_SIZE;
+        while (frameIndex - initialFrameIndex < maxFrames && frameIndex < this._frameKeys.length) {
+          const i = this._frameKeys[frameIndex];
+          const data = this._frames[i];
+          const rect = data.frame;
+          if (rect) {
+            let frame = null;
+            let trim = null;
+            const sourceSize = data.trimmed !== false && data.sourceSize ? data.sourceSize : data.frame;
+            const orig = new Rectangle(
+              0,
+              0,
+              Math.floor(sourceSize.w) / this.resolution,
+              Math.floor(sourceSize.h) / this.resolution
+            );
+            if (data.rotated) {
+              frame = new Rectangle(
+                Math.floor(rect.x) / this.resolution,
+                Math.floor(rect.y) / this.resolution,
+                Math.floor(rect.h) / this.resolution,
+                Math.floor(rect.w) / this.resolution
+              );
+            } else {
+              frame = new Rectangle(
+                Math.floor(rect.x) / this.resolution,
+                Math.floor(rect.y) / this.resolution,
+                Math.floor(rect.w) / this.resolution,
+                Math.floor(rect.h) / this.resolution
+              );
+            }
+            if (data.trimmed !== false && data.spriteSourceSize) {
+              trim = new Rectangle(
+                Math.floor(data.spriteSourceSize.x) / this.resolution,
+                Math.floor(data.spriteSourceSize.y) / this.resolution,
+                Math.floor(rect.w) / this.resolution,
+                Math.floor(rect.h) / this.resolution
+              );
+            }
+            this.textures[i] = new Texture({
+              source: this.textureSource,
+              frame,
+              orig,
+              trim,
+              rotate: data.rotated ? 2 : 0,
+              defaultAnchor: data.anchor,
+              defaultBorders: data.borders,
+              label: i.toString()
+            });
+          }
+          frameIndex++;
+        }
+      }
+      /** Parse animations config. */
+      _processAnimations() {
+        const animations = this.data.animations || {};
+        for (const animName in animations) {
+          this.animations[animName] = [];
+          for (let i = 0; i < animations[animName].length; i++) {
+            const frameName = animations[animName][i];
+            this.animations[animName].push(this.textures[frameName]);
+          }
+        }
+      }
+      /** The parse has completed. */
+      _parseComplete() {
+        const callback = this._callback;
+        this._callback = null;
+        this._batchIndex = 0;
+        callback.call(this, this.textures);
+      }
+      /** Begin the next batch of textures. */
+      _nextBatch() {
+        this._processFrames(this._batchIndex * _Spritesheet.BATCH_SIZE);
+        this._batchIndex++;
+        setTimeout(() => {
+          if (this._batchIndex * _Spritesheet.BATCH_SIZE < this._frameKeys.length) {
+            this._nextBatch();
+          } else {
+            this._processAnimations();
+            this._parseComplete();
+          }
+        }, 0);
+      }
+      /**
+       * Destroy Spritesheet and don't use after this.
+       * @param {boolean} [destroyBase=false] - Whether to destroy the base texture as well
+       */
+      destroy(destroyBase = false) {
+        var _a;
+        for (const i in this.textures) {
+          this.textures[i].destroy();
+        }
+        this._frames = null;
+        this._frameKeys = null;
+        this.data = null;
+        this.textures = null;
+        if (destroyBase) {
+          (_a = this._texture) == null ? void 0 : _a.destroy();
+          this.textureSource.destroy();
+        }
+        this._texture = null;
+        this.textureSource = null;
+        this.linkedSheets = [];
+      }
+    };
+    /** The maximum number of Textures to build per process. */
+    _Spritesheet.BATCH_SIZE = 1e3;
+    let Spritesheet = _Spritesheet;
+
+    "use strict";
+    const validImages = ["jpg", "png", "jpeg", "avif", "webp"];
+    function getCacheableAssets(keys, asset, ignoreMultiPack) {
+      const out = {};
+      keys.forEach((key) => {
+        out[key] = asset;
+      });
+      Object.keys(asset.textures).forEach((key) => {
+        out[key] = asset.textures[key];
+      });
+      if (!ignoreMultiPack) {
+        const basePath = path.dirname(keys[0]);
+        asset.linkedSheets.forEach((item, i) => {
+          const out2 = getCacheableAssets([`${basePath}/${asset.data.meta.related_multi_packs[i]}`], item, true);
+          Object.assign(out, out2);
+        });
+      }
+      return out;
+    }
+    const spritesheetAsset = {
+      extension: ExtensionType.Asset,
+      /** Handle the caching of the related Spritesheet Textures */
+      cache: {
+        test: (asset) => asset instanceof Spritesheet,
+        getCacheableAssets: (keys, asset) => getCacheableAssets(keys, asset, false)
+      },
+      /** Resolve the resolution of the asset. */
+      resolver: {
+        test: (value) => {
+          const tempURL = value.split("?")[0];
+          const split = tempURL.split(".");
+          const extension = split.pop();
+          const format = split.pop();
+          return extension === "json" && validImages.includes(format);
+        },
+        parse: (value) => {
+          var _a, _b;
+          const split = value.split(".");
+          return {
+            resolution: parseFloat((_b = (_a = Resolver.RETINA_PREFIX.exec(value)) == null ? void 0 : _a[1]) != null ? _b : "1"),
+            format: split[split.length - 2],
+            src: value
+          };
+        }
+      },
+      /**
+       * Loader plugin that parses sprite sheets!
+       * once the JSON has been loaded this checks to see if the JSON is spritesheet data.
+       * If it is, we load the spritesheets image and parse the data into Spritesheet
+       * All textures in the sprite sheet are then added to the cache
+       */
+      loader: {
+        name: "spritesheetLoader",
+        extension: {
+          type: ExtensionType.LoadParser,
+          priority: LoaderParserPriority.Normal
+        },
+        async testParse(asset, options) {
+          return path.extname(options.src).toLowerCase() === ".json" && !!asset.frames;
+        },
+        async parse(asset, options, loader) {
+          var _a, _b, _c;
+          const {
+            texture: imageTexture,
+            // if user need to use preloaded texture
+            imageFilename
+            // if user need to use custom filename (not from jsonFile.meta.image)
+          } = (_a = options == null ? void 0 : options.data) != null ? _a : {};
+          let basePath = path.dirname(options.src);
+          if (basePath && basePath.lastIndexOf("/") !== basePath.length - 1) {
+            basePath += "/";
+          }
+          let texture;
+          if (imageTexture instanceof Texture) {
+            texture = imageTexture;
+          } else {
+            const imagePath = copySearchParams(basePath + (imageFilename != null ? imageFilename : asset.meta.image), options.src);
+            const assets = await loader.load([imagePath]);
+            texture = assets[imagePath];
+          }
+          const spritesheet = new Spritesheet(
+            texture.source,
+            asset
+          );
+          await spritesheet.parse();
+          const multiPacks = (_b = asset == null ? void 0 : asset.meta) == null ? void 0 : _b.related_multi_packs;
+          if (Array.isArray(multiPacks)) {
+            const promises = [];
+            for (const item of multiPacks) {
+              if (typeof item !== "string") {
+                continue;
+              }
+              let itemUrl = basePath + item;
+              if ((_c = options.data) == null ? void 0 : _c.ignoreMultiPack) {
+                continue;
+              }
+              itemUrl = copySearchParams(itemUrl, options.src);
+              promises.push(loader.load({
+                src: itemUrl,
+                data: {
+                  ignoreMultiPack: true
+                }
+              }));
+            }
+            const res = await Promise.all(promises);
+            spritesheet.linkedSheets = res;
+            res.forEach((item) => {
+              item.linkedSheets = [spritesheet].concat(spritesheet.linkedSheets.filter((sp) => sp !== item));
+            });
+          }
+          return spritesheet;
+        },
+        unload(spritesheet) {
+          spritesheet.destroy(true);
+        }
+      }
+    };
+
+    "use strict";
+    extensions.add(spritesheetAsset);
+
+    "use strict";
     class ObservablePoint {
       /**
        * Creates a new `ObservablePoint`
@@ -1574,47 +9902,441 @@ var PIXI = (function (exports) {
     }
 
     "use strict";
-    const uidCache = {
-      default: -1
-    };
-    function uid(name = "default") {
-      if (uidCache[name] === void 0) {
-        uidCache[name] = -1;
+    function updateQuadBounds(bounds, anchor, texture, padding) {
+      const { width, height } = texture.orig;
+      const trim = texture.trim;
+      if (trim) {
+        const sourceWidth = trim.width;
+        const sourceHeight = trim.height;
+        bounds.minX = trim.x - anchor._x * width - padding;
+        bounds.maxX = bounds.minX + sourceWidth;
+        bounds.minY = trim.y - anchor._y * height - padding;
+        bounds.maxY = bounds.minY + sourceHeight;
+      } else {
+        bounds.minX = -anchor._x * width - padding;
+        bounds.maxX = bounds.minX + width;
+        bounds.minY = -anchor._y * height - padding;
+        bounds.maxY = bounds.minY + height;
       }
-      return ++uidCache[name];
+      return;
     }
 
+    var r={grad:.9,turn:360,rad:360/(2*Math.PI)},t=function(r){return "string"==typeof r?r.length>0:"number"==typeof r},n=function(r,t,n){return void 0===t&&(t=0),void 0===n&&(n=Math.pow(10,t)),Math.round(n*r)/n+0},e=function(r,t,n){return void 0===t&&(t=0),void 0===n&&(n=1),r>n?n:r>t?r:t},u=function(r){return (r=isFinite(r)?r%360:0)>0?r:r+360},a=function(r){return {r:e(r.r,0,255),g:e(r.g,0,255),b:e(r.b,0,255),a:e(r.a)}},o=function(r){return {r:n(r.r),g:n(r.g),b:n(r.b),a:n(r.a,3)}},i=/^#([0-9a-f]{3,8})$/i,s=function(r){var t=r.toString(16);return t.length<2?"0"+t:t},h=function(r){var t=r.r,n=r.g,e=r.b,u=r.a,a=Math.max(t,n,e),o=a-Math.min(t,n,e),i=o?a===t?(n-e)/o:a===n?2+(e-t)/o:4+(t-n)/o:0;return {h:60*(i<0?i+6:i),s:a?o/a*100:0,v:a/255*100,a:u}},b=function(r){var t=r.h,n=r.s,e=r.v,u=r.a;t=t/360*6,n/=100,e/=100;var a=Math.floor(t),o=e*(1-n),i=e*(1-(t-a)*n),s=e*(1-(1-t+a)*n),h=a%6;return {r:255*[e,i,o,o,s,e][h],g:255*[s,e,e,i,o,o][h],b:255*[o,o,s,e,e,i][h],a:u}},g=function(r){return {h:u(r.h),s:e(r.s,0,100),l:e(r.l,0,100),a:e(r.a)}},d=function(r){return {h:n(r.h),s:n(r.s),l:n(r.l),a:n(r.a,3)}},f=function(r){return b((n=(t=r).s,{h:t.h,s:(n*=((e=t.l)<50?e:100-e)/100)>0?2*n/(e+n)*100:0,v:e+n,a:t.a}));var t,n,e;},c=function(r){return {h:(t=h(r)).h,s:(u=(200-(n=t.s))*(e=t.v)/100)>0&&u<200?n*e/100/(u<=100?u:200-u)*100:0,l:u/2,a:t.a};var t,n,e,u;},l=/^hsla?\(\s*([+-]?\d*\.?\d+)(deg|rad|grad|turn)?\s*,\s*([+-]?\d*\.?\d+)%\s*,\s*([+-]?\d*\.?\d+)%\s*(?:,\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,p=/^hsla?\(\s*([+-]?\d*\.?\d+)(deg|rad|grad|turn)?\s+([+-]?\d*\.?\d+)%\s+([+-]?\d*\.?\d+)%\s*(?:\/\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,v=/^rgba?\(\s*([+-]?\d*\.?\d+)(%)?\s*,\s*([+-]?\d*\.?\d+)(%)?\s*,\s*([+-]?\d*\.?\d+)(%)?\s*(?:,\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,m=/^rgba?\(\s*([+-]?\d*\.?\d+)(%)?\s+([+-]?\d*\.?\d+)(%)?\s+([+-]?\d*\.?\d+)(%)?\s*(?:\/\s*([+-]?\d*\.?\d+)(%)?\s*)?\)$/i,y={string:[[function(r){var t=i.exec(r);return t?(r=t[1]).length<=4?{r:parseInt(r[0]+r[0],16),g:parseInt(r[1]+r[1],16),b:parseInt(r[2]+r[2],16),a:4===r.length?n(parseInt(r[3]+r[3],16)/255,2):1}:6===r.length||8===r.length?{r:parseInt(r.substr(0,2),16),g:parseInt(r.substr(2,2),16),b:parseInt(r.substr(4,2),16),a:8===r.length?n(parseInt(r.substr(6,2),16)/255,2):1}:null:null},"hex"],[function(r){var t=v.exec(r)||m.exec(r);return t?t[2]!==t[4]||t[4]!==t[6]?null:a({r:Number(t[1])/(t[2]?100/255:1),g:Number(t[3])/(t[4]?100/255:1),b:Number(t[5])/(t[6]?100/255:1),a:void 0===t[7]?1:Number(t[7])/(t[8]?100:1)}):null},"rgb"],[function(t){var n=l.exec(t)||p.exec(t);if(!n)return null;var e,u,a=g({h:(e=n[1],u=n[2],void 0===u&&(u="deg"),Number(e)*(r[u]||1)),s:Number(n[3]),l:Number(n[4]),a:void 0===n[5]?1:Number(n[5])/(n[6]?100:1)});return f(a)},"hsl"]],object:[[function(r){var n=r.r,e=r.g,u=r.b,o=r.a,i=void 0===o?1:o;return t(n)&&t(e)&&t(u)?a({r:Number(n),g:Number(e),b:Number(u),a:Number(i)}):null},"rgb"],[function(r){var n=r.h,e=r.s,u=r.l,a=r.a,o=void 0===a?1:a;if(!t(n)||!t(e)||!t(u))return null;var i=g({h:Number(n),s:Number(e),l:Number(u),a:Number(o)});return f(i)},"hsl"],[function(r){var n=r.h,a=r.s,o=r.v,i=r.a,s=void 0===i?1:i;if(!t(n)||!t(a)||!t(o))return null;var h=function(r){return {h:u(r.h),s:e(r.s,0,100),v:e(r.v,0,100),a:e(r.a)}}({h:Number(n),s:Number(a),v:Number(o),a:Number(s)});return b(h)},"hsv"]]},N=function(r,t){for(var n=0;n<t.length;n++){var e=t[n][0](r);if(e)return [e,t[n][1]]}return [null,void 0]},x=function(r){return "string"==typeof r?N(r.trim(),y.string):"object"==typeof r&&null!==r?N(r,y.object):[null,void 0]},I=function(r){return x(r)[1]},M=function(r,t){var n=c(r);return {h:n.h,s:e(n.s+100*t,0,100),l:n.l,a:n.a}},H=function(r){return (299*r.r+587*r.g+114*r.b)/1e3/255},$=function(r,t){var n=c(r);return {h:n.h,s:n.s,l:e(n.l+100*t,0,100),a:n.a}},j=function(){function r(r){this.parsed=x(r)[0],this.rgba=this.parsed||{r:0,g:0,b:0,a:1};}return r.prototype.isValid=function(){return null!==this.parsed},r.prototype.brightness=function(){return n(H(this.rgba),2)},r.prototype.isDark=function(){return H(this.rgba)<.5},r.prototype.isLight=function(){return H(this.rgba)>=.5},r.prototype.toHex=function(){return r=o(this.rgba),t=r.r,e=r.g,u=r.b,i=(a=r.a)<1?s(n(255*a)):"","#"+s(t)+s(e)+s(u)+i;var r,t,e,u,a,i;},r.prototype.toRgb=function(){return o(this.rgba)},r.prototype.toRgbString=function(){return r=o(this.rgba),t=r.r,n=r.g,e=r.b,(u=r.a)<1?"rgba("+t+", "+n+", "+e+", "+u+")":"rgb("+t+", "+n+", "+e+")";var r,t,n,e,u;},r.prototype.toHsl=function(){return d(c(this.rgba))},r.prototype.toHslString=function(){return r=d(c(this.rgba)),t=r.h,n=r.s,e=r.l,(u=r.a)<1?"hsla("+t+", "+n+"%, "+e+"%, "+u+")":"hsl("+t+", "+n+"%, "+e+"%)";var r,t,n,e,u;},r.prototype.toHsv=function(){return r=h(this.rgba),{h:n(r.h),s:n(r.s),v:n(r.v),a:n(r.a,3)};var r;},r.prototype.invert=function(){return w({r:255-(r=this.rgba).r,g:255-r.g,b:255-r.b,a:r.a});var r;},r.prototype.saturate=function(r){return void 0===r&&(r=.1),w(M(this.rgba,r))},r.prototype.desaturate=function(r){return void 0===r&&(r=.1),w(M(this.rgba,-r))},r.prototype.grayscale=function(){return w(M(this.rgba,-1))},r.prototype.lighten=function(r){return void 0===r&&(r=.1),w($(this.rgba,r))},r.prototype.darken=function(r){return void 0===r&&(r=.1),w($(this.rgba,-r))},r.prototype.rotate=function(r){return void 0===r&&(r=15),this.hue(this.hue()+r)},r.prototype.alpha=function(r){return "number"==typeof r?w({r:(t=this.rgba).r,g:t.g,b:t.b,a:r}):n(this.rgba.a,3);var t;},r.prototype.hue=function(r){var t=c(this.rgba);return "number"==typeof r?w({h:r,s:t.s,l:t.l,a:t.a}):n(t.h)},r.prototype.isEqual=function(r){return this.toHex()===w(r).toHex()},r}(),w=function(r){return r instanceof j?r:new j(r)},S=[],k=function(r){r.forEach(function(r){S.indexOf(r)<0&&(r(j,y),S.push(r));});},E=function(){return new j({r:255*Math.random(),g:255*Math.random(),b:255*Math.random()})};
+
+    function namesPlugin(e,f){var a={white:"#ffffff",bisque:"#ffe4c4",blue:"#0000ff",cadetblue:"#5f9ea0",chartreuse:"#7fff00",chocolate:"#d2691e",coral:"#ff7f50",antiquewhite:"#faebd7",aqua:"#00ffff",azure:"#f0ffff",whitesmoke:"#f5f5f5",papayawhip:"#ffefd5",plum:"#dda0dd",blanchedalmond:"#ffebcd",black:"#000000",gold:"#ffd700",goldenrod:"#daa520",gainsboro:"#dcdcdc",cornsilk:"#fff8dc",cornflowerblue:"#6495ed",burlywood:"#deb887",aquamarine:"#7fffd4",beige:"#f5f5dc",crimson:"#dc143c",cyan:"#00ffff",darkblue:"#00008b",darkcyan:"#008b8b",darkgoldenrod:"#b8860b",darkkhaki:"#bdb76b",darkgray:"#a9a9a9",darkgreen:"#006400",darkgrey:"#a9a9a9",peachpuff:"#ffdab9",darkmagenta:"#8b008b",darkred:"#8b0000",darkorchid:"#9932cc",darkorange:"#ff8c00",darkslateblue:"#483d8b",gray:"#808080",darkslategray:"#2f4f4f",darkslategrey:"#2f4f4f",deeppink:"#ff1493",deepskyblue:"#00bfff",wheat:"#f5deb3",firebrick:"#b22222",floralwhite:"#fffaf0",ghostwhite:"#f8f8ff",darkviolet:"#9400d3",magenta:"#ff00ff",green:"#008000",dodgerblue:"#1e90ff",grey:"#808080",honeydew:"#f0fff0",hotpink:"#ff69b4",blueviolet:"#8a2be2",forestgreen:"#228b22",lawngreen:"#7cfc00",indianred:"#cd5c5c",indigo:"#4b0082",fuchsia:"#ff00ff",brown:"#a52a2a",maroon:"#800000",mediumblue:"#0000cd",lightcoral:"#f08080",darkturquoise:"#00ced1",lightcyan:"#e0ffff",ivory:"#fffff0",lightyellow:"#ffffe0",lightsalmon:"#ffa07a",lightseagreen:"#20b2aa",linen:"#faf0e6",mediumaquamarine:"#66cdaa",lemonchiffon:"#fffacd",lime:"#00ff00",khaki:"#f0e68c",mediumseagreen:"#3cb371",limegreen:"#32cd32",mediumspringgreen:"#00fa9a",lightskyblue:"#87cefa",lightblue:"#add8e6",midnightblue:"#191970",lightpink:"#ffb6c1",mistyrose:"#ffe4e1",moccasin:"#ffe4b5",mintcream:"#f5fffa",lightslategray:"#778899",lightslategrey:"#778899",navajowhite:"#ffdead",navy:"#000080",mediumvioletred:"#c71585",powderblue:"#b0e0e6",palegoldenrod:"#eee8aa",oldlace:"#fdf5e6",paleturquoise:"#afeeee",mediumturquoise:"#48d1cc",mediumorchid:"#ba55d3",rebeccapurple:"#663399",lightsteelblue:"#b0c4de",mediumslateblue:"#7b68ee",thistle:"#d8bfd8",tan:"#d2b48c",orchid:"#da70d6",mediumpurple:"#9370db",purple:"#800080",pink:"#ffc0cb",skyblue:"#87ceeb",springgreen:"#00ff7f",palegreen:"#98fb98",red:"#ff0000",yellow:"#ffff00",slateblue:"#6a5acd",lavenderblush:"#fff0f5",peru:"#cd853f",palevioletred:"#db7093",violet:"#ee82ee",teal:"#008080",slategray:"#708090",slategrey:"#708090",aliceblue:"#f0f8ff",darkseagreen:"#8fbc8f",darkolivegreen:"#556b2f",greenyellow:"#adff2f",seagreen:"#2e8b57",seashell:"#fff5ee",tomato:"#ff6347",silver:"#c0c0c0",sienna:"#a0522d",lavender:"#e6e6fa",lightgreen:"#90ee90",orange:"#ffa500",orangered:"#ff4500",steelblue:"#4682b4",royalblue:"#4169e1",turquoise:"#40e0d0",yellowgreen:"#9acd32",salmon:"#fa8072",saddlebrown:"#8b4513",sandybrown:"#f4a460",rosybrown:"#bc8f8f",darksalmon:"#e9967a",lightgoldenrodyellow:"#fafad2",snow:"#fffafa",lightgrey:"#d3d3d3",lightgray:"#d3d3d3",dimgray:"#696969",dimgrey:"#696969",olivedrab:"#6b8e23",olive:"#808000"},r={};for(var d in a)r[a[d]]=d;var l={};e.prototype.toName=function(f){if(!(this.rgba.a||this.rgba.r||this.rgba.g||this.rgba.b))return "transparent";var d,i,n=r[this.toHex()];if(n)return n;if(null==f?void 0:f.closest){var o=this.toRgb(),t=1/0,b="black";if(!l.length)for(var c in a)l[c]=new e(a[c]).toRgb();for(var g in a){var u=(d=o,i=l[g],Math.pow(d.r-i.r,2)+Math.pow(d.g-i.g,2)+Math.pow(d.b-i.b,2));u<t&&(t=u,b=g);}return b}};f.string.push([function(f){var r=f.toLowerCase(),d="transparent"===r?"#0000":a[r];return d?new e(d).toRgb():null},"name"]);}
+
     "use strict";
-    const warnings = {};
-    const v8_0_0 = "8.0.0";
-    function deprecation(version, message, ignoreDepth = 3) {
-      if (warnings[message]) {
-        return;
+    var __defProp$Q = Object.defineProperty;
+    var __getOwnPropSymbols$Q = Object.getOwnPropertySymbols;
+    var __hasOwnProp$Q = Object.prototype.hasOwnProperty;
+    var __propIsEnum$Q = Object.prototype.propertyIsEnumerable;
+    var __defNormalProp$Q = (obj, key, value) => key in obj ? __defProp$Q(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    var __spreadValues$Q = (a, b) => {
+      for (var prop in b || (b = {}))
+        if (__hasOwnProp$Q.call(b, prop))
+          __defNormalProp$Q(a, prop, b[prop]);
+      if (__getOwnPropSymbols$Q)
+        for (var prop of __getOwnPropSymbols$Q(b)) {
+          if (__propIsEnum$Q.call(b, prop))
+            __defNormalProp$Q(a, prop, b[prop]);
+        }
+      return a;
+    };
+    k([namesPlugin]);
+    const _Color = class _Color {
+      /**
+       * @param {ColorSource} value - Optional value to use, if not provided, white is used.
+       */
+      constructor(value = 16777215) {
+        this._value = null;
+        this._components = new Float32Array(4);
+        this._components.fill(1);
+        this._int = 16777215;
+        this.value = value;
       }
-      let stack = new Error().stack;
-      if (typeof stack === "undefined") {
-        console.warn("PixiJS Deprecation Warning: ", `${message}
-Deprecated since v${version}`);
-      } else {
-        stack = stack.split("\n").splice(ignoreDepth).join("\n");
-        if (console.groupCollapsed) {
-          console.groupCollapsed(
-            "%cPixiJS Deprecation Warning: %c%s",
-            "color:#614108;background:#fffbe6",
-            "font-weight:normal;color:#614108;background:#fffbe6",
-            `${message}
-Deprecated since v${version}`
-          );
-          console.warn(stack);
-          console.groupEnd();
-        } else {
-          console.warn("PixiJS Deprecation Warning: ", `${message}
-Deprecated since v${version}`);
-          console.warn(stack);
+      /** Get red component (0 - 1) */
+      get red() {
+        return this._components[0];
+      }
+      /** Get green component (0 - 1) */
+      get green() {
+        return this._components[1];
+      }
+      /** Get blue component (0 - 1) */
+      get blue() {
+        return this._components[2];
+      }
+      /** Get alpha component (0 - 1) */
+      get alpha() {
+        return this._components[3];
+      }
+      /**
+       * Set the value, suitable for chaining
+       * @param value
+       * @see Color.value
+       */
+      setValue(value) {
+        this.value = value;
+        return this;
+      }
+      /**
+       * The current color source.
+       *
+       * When setting:
+       * - Setting to an instance of `Color` will copy its color source and components.
+       * - Otherwise, `Color` will try to normalize the color source and set the components.
+       *   If the color source is invalid, an `Error` will be thrown and the `Color` will left unchanged.
+       *
+       * Note: The `null` in the setter's parameter type is added to match the TypeScript rule: return type of getter
+       * must be assignable to its setter's parameter type. Setting `value` to `null` will throw an `Error`.
+       *
+       * When getting:
+       * - A return value of `null` means the previous value was overridden (e.g., {@link Color.multiply multiply},
+       *   {@link Color.premultiply premultiply} or {@link Color.round round}).
+       * - Otherwise, the color source used when setting is returned.
+       * @type {ColorSource}
+       */
+      set value(value) {
+        if (value instanceof _Color) {
+          this._value = this._cloneSource(value._value);
+          this._int = value._int;
+          this._components.set(value._components);
+        } else if (value === null) {
+          throw new Error("Cannot set Color#value to null");
+        } else if (this._value === null || !this._isSourceEqual(this._value, value)) {
+          this._normalize(value);
+          this._value = this._cloneSource(value);
         }
       }
-      warnings[message] = true;
-    }
+      get value() {
+        return this._value;
+      }
+      /**
+       * Copy a color source internally.
+       * @param value - Color source
+       */
+      _cloneSource(value) {
+        if (typeof value === "string" || typeof value === "number" || value instanceof Number || value === null) {
+          return value;
+        } else if (Array.isArray(value) || ArrayBuffer.isView(value)) {
+          return value.slice(0);
+        } else if (typeof value === "object" && value !== null) {
+          return __spreadValues$Q({}, value);
+        }
+        return value;
+      }
+      /**
+       * Equality check for color sources.
+       * @param value1 - First color source
+       * @param value2 - Second color source
+       * @returns `true` if the color sources are equal, `false` otherwise.
+       */
+      _isSourceEqual(value1, value2) {
+        const type1 = typeof value1;
+        const type2 = typeof value2;
+        if (type1 !== type2) {
+          return false;
+        } else if (type1 === "number" || type1 === "string" || value1 instanceof Number) {
+          return value1 === value2;
+        } else if (Array.isArray(value1) && Array.isArray(value2) || ArrayBuffer.isView(value1) && ArrayBuffer.isView(value2)) {
+          if (value1.length !== value2.length) {
+            return false;
+          }
+          return value1.every((v, i) => v === value2[i]);
+        } else if (value1 !== null && value2 !== null) {
+          const keys1 = Object.keys(value1);
+          const keys2 = Object.keys(value2);
+          if (keys1.length !== keys2.length) {
+            return false;
+          }
+          return keys1.every((key) => value1[key] === value2[key]);
+        }
+        return value1 === value2;
+      }
+      /**
+       * Convert to a RGBA color object.
+       * @example
+       * import { Color } from 'pixi.js';
+       * new Color('white').toRgb(); // returns { r: 1, g: 1, b: 1, a: 1 }
+       */
+      toRgba() {
+        const [r, g, b, a] = this._components;
+        return { r, g, b, a };
+      }
+      /**
+       * Convert to a RGB color object.
+       * @example
+       * import { Color } from 'pixi.js';
+       * new Color('white').toRgb(); // returns { r: 1, g: 1, b: 1 }
+       */
+      toRgb() {
+        const [r, g, b] = this._components;
+        return { r, g, b };
+      }
+      /** Convert to a CSS-style rgba string: `rgba(255,255,255,1.0)`. */
+      toRgbaString() {
+        const [r, g, b] = this.toUint8RgbArray();
+        return `rgba(${r},${g},${b},${this.alpha})`;
+      }
+      toUint8RgbArray(out) {
+        const [r, g, b] = this._components;
+        if (!this._arrayRgb) {
+          this._arrayRgb = [];
+        }
+        out = out || this._arrayRgb;
+        out[0] = Math.round(r * 255);
+        out[1] = Math.round(g * 255);
+        out[2] = Math.round(b * 255);
+        return out;
+      }
+      toArray(out) {
+        if (!this._arrayRgba) {
+          this._arrayRgba = [];
+        }
+        out = out || this._arrayRgba;
+        const [r, g, b, a] = this._components;
+        out[0] = r;
+        out[1] = g;
+        out[2] = b;
+        out[3] = a;
+        return out;
+      }
+      toRgbArray(out) {
+        if (!this._arrayRgb) {
+          this._arrayRgb = [];
+        }
+        out = out || this._arrayRgb;
+        const [r, g, b] = this._components;
+        out[0] = r;
+        out[1] = g;
+        out[2] = b;
+        return out;
+      }
+      /**
+       * Convert to a hexadecimal number.
+       * @example
+       * import { Color } from 'pixi.js';
+       * new Color('white').toNumber(); // returns 16777215
+       */
+      toNumber() {
+        return this._int;
+      }
+      /**
+       * Convert to a BGR number
+       * @example
+       * import { Color } from 'pixi.js';
+       * new Color(0xffcc99).toBgrNumber(); // returns 0x99ccff
+       */
+      toBgrNumber() {
+        const [r, g, b] = this.toUint8RgbArray();
+        return (b << 16) + (g << 8) + r;
+      }
+      /**
+       * Convert to a hexadecimal number in little endian format (e.g., BBGGRR).
+       * @example
+       * import { Color } from 'pixi.js';
+       * new Color(0xffcc99).toLittleEndianNumber(); // returns 0x99ccff
+       * @returns {number} - The color as a number in little endian format.
+       */
+      toLittleEndianNumber() {
+        const value = this._int;
+        return (value >> 16) + (value & 65280) + ((value & 255) << 16);
+      }
+      /**
+       * Multiply with another color. This action is destructive, and will
+       * override the previous `value` property to be `null`.
+       * @param {ColorSource} value - The color to multiply by.
+       */
+      multiply(value) {
+        const [r, g, b, a] = _Color._temp.setValue(value)._components;
+        this._components[0] *= r;
+        this._components[1] *= g;
+        this._components[2] *= b;
+        this._components[3] *= a;
+        this._refreshInt();
+        this._value = null;
+        return this;
+      }
+      /**
+       * Converts color to a premultiplied alpha format. This action is destructive, and will
+       * override the previous `value` property to be `null`.
+       * @param alpha - The alpha to multiply by.
+       * @param {boolean} [applyToRGB=true] - Whether to premultiply RGB channels.
+       * @returns {Color} - Itself.
+       */
+      premultiply(alpha, applyToRGB = true) {
+        if (applyToRGB) {
+          this._components[0] *= alpha;
+          this._components[1] *= alpha;
+          this._components[2] *= alpha;
+        }
+        this._components[3] = alpha;
+        this._refreshInt();
+        this._value = null;
+        return this;
+      }
+      /**
+       * Premultiplies alpha with current color.
+       * @param {number} alpha - The alpha to multiply by.
+       * @param {boolean} [applyToRGB=true] - Whether to premultiply RGB channels.
+       * @returns {number} tint multiplied by alpha
+       */
+      toPremultiplied(alpha, applyToRGB = true) {
+        if (alpha === 1) {
+          return (255 << 24) + this._int;
+        }
+        if (alpha === 0) {
+          return applyToRGB ? 0 : this._int;
+        }
+        let r = this._int >> 16 & 255;
+        let g = this._int >> 8 & 255;
+        let b = this._int & 255;
+        if (applyToRGB) {
+          r = r * alpha + 0.5 | 0;
+          g = g * alpha + 0.5 | 0;
+          b = b * alpha + 0.5 | 0;
+        }
+        return (alpha * 255 << 24) + (r << 16) + (g << 8) + b;
+      }
+      /**
+       * Convert to a hexidecimal string.
+       * @example
+       * import { Color } from 'pixi.js';
+       * new Color('white').toHex(); // returns "#ffffff"
+       */
+      toHex() {
+        const hexString = this._int.toString(16);
+        return `#${"000000".substring(0, 6 - hexString.length) + hexString}`;
+      }
+      /**
+       * Convert to a hexidecimal string with alpha.
+       * @example
+       * import { Color } from 'pixi.js';
+       * new Color('white').toHexa(); // returns "#ffffffff"
+       */
+      toHexa() {
+        const alphaValue = Math.round(this._components[3] * 255);
+        const alphaString = alphaValue.toString(16);
+        return this.toHex() + "00".substring(0, 2 - alphaString.length) + alphaString;
+      }
+      /**
+       * Set alpha, suitable for chaining.
+       * @param alpha
+       */
+      setAlpha(alpha) {
+        this._components[3] = this._clamp(alpha);
+        return this;
+      }
+      /**
+       * Normalize the input value into rgba
+       * @param value - Input value
+       */
+      _normalize(value) {
+        let r;
+        let g;
+        let b;
+        let a;
+        if ((typeof value === "number" || value instanceof Number) && value >= 0 && value <= 16777215) {
+          const int = value;
+          r = (int >> 16 & 255) / 255;
+          g = (int >> 8 & 255) / 255;
+          b = (int & 255) / 255;
+          a = 1;
+        } else if ((Array.isArray(value) || value instanceof Float32Array) && value.length >= 3 && value.length <= 4) {
+          value = this._clamp(value);
+          [r, g, b, a = 1] = value;
+        } else if ((value instanceof Uint8Array || value instanceof Uint8ClampedArray) && value.length >= 3 && value.length <= 4) {
+          value = this._clamp(value, 0, 255);
+          [r, g, b, a = 255] = value;
+          r /= 255;
+          g /= 255;
+          b /= 255;
+          a /= 255;
+        } else if (typeof value === "string" || typeof value === "object") {
+          if (typeof value === "string") {
+            const match = _Color.HEX_PATTERN.exec(value);
+            if (match) {
+              value = `#${match[2]}`;
+            }
+          }
+          const color = w(value);
+          if (color.isValid()) {
+            ({ r, g, b, a } = color.rgba);
+            r /= 255;
+            g /= 255;
+            b /= 255;
+          }
+        }
+        if (r !== void 0) {
+          this._components[0] = r;
+          this._components[1] = g;
+          this._components[2] = b;
+          this._components[3] = a;
+          this._refreshInt();
+        } else {
+          throw new Error(`Unable to convert color ${value}`);
+        }
+      }
+      /** Refresh the internal color rgb number */
+      _refreshInt() {
+        this._clamp(this._components);
+        const [r, g, b] = this._components;
+        this._int = (r * 255 << 16) + (g * 255 << 8) + (b * 255 | 0);
+      }
+      /**
+       * Clamps values to a range. Will override original values
+       * @param value - Value(s) to clamp
+       * @param min - Minimum value
+       * @param max - Maximum value
+       */
+      _clamp(value, min = 0, max = 1) {
+        if (typeof value === "number") {
+          return Math.min(Math.max(value, min), max);
+        }
+        value.forEach((v, i) => {
+          value[i] = Math.min(Math.max(v, min), max);
+        });
+        return value;
+      }
+      /**
+       * Check if the value is a color-like object
+       * @param value - Value to check
+       * @returns True if the value is a color-like object
+       * @static
+       * @example
+       * import { Color } from 'pixi.js';
+       * Color.isColorLike('white'); // returns true
+       * Color.isColorLike(0xffffff); // returns true
+       * Color.isColorLike([1, 1, 1]); // returns true
+       */
+      static isColorLike(value) {
+        return typeof value === "number" || typeof value === "string" || value instanceof Number || value instanceof _Color || Array.isArray(value) || value instanceof Uint8Array || value instanceof Uint8ClampedArray || value instanceof Float32Array || value.r !== void 0 && value.g !== void 0 && value.b !== void 0 || value.r !== void 0 && value.g !== void 0 && value.b !== void 0 && value.a !== void 0 || value.h !== void 0 && value.s !== void 0 && value.l !== void 0 || value.h !== void 0 && value.s !== void 0 && value.l !== void 0 && value.a !== void 0 || value.h !== void 0 && value.s !== void 0 && value.v !== void 0 || value.h !== void 0 && value.s !== void 0 && value.v !== void 0 && value.a !== void 0;
+      }
+    };
+    /**
+     * Default Color object for static uses
+     * @example
+     * import { Color } from 'pixi.js';
+     * Color.shared.setValue(0xffffff).toHex(); // '#ffffff'
+     */
+    _Color.shared = new _Color();
+    /**
+     * Temporary Color object for static uses internally.
+     * As to not conflict with Color.shared.
+     * @ignore
+     */
+    _Color._temp = new _Color();
+    /** Pattern for hex strings */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    _Color.HEX_PATTERN = /^(#|0x)?(([a-f0-9]{3}){1,2}([a-f0-9]{2})?)$/i;
+    let Color = _Color;
+
+    "use strict";
+    const cullingMixin = {
+      cullArea: null,
+      cullable: false,
+      cullableChildren: true
+    };
 
     "use strict";
     function removeItems(arr, startIdx, removeCount) {
@@ -2213,264 +10935,6 @@ Deprecated since v${version}`);
     };
 
     "use strict";
-    const tempPoints = [new Point(), new Point(), new Point(), new Point()];
-    class Rectangle {
-      /**
-       * @param x - The X coordinate of the upper-left corner of the rectangle
-       * @param y - The Y coordinate of the upper-left corner of the rectangle
-       * @param width - The overall width of the rectangle
-       * @param height - The overall height of the rectangle
-       */
-      constructor(x = 0, y = 0, width = 0, height = 0) {
-        /**
-         * The type of the object, mainly used to avoid `instanceof` checks
-         * @default 'rectangle'
-         */
-        this.type = "rectangle";
-        this.x = Number(x);
-        this.y = Number(y);
-        this.width = Number(width);
-        this.height = Number(height);
-      }
-      /** Returns the left edge of the rectangle. */
-      get left() {
-        return this.x;
-      }
-      /** Returns the right edge of the rectangle. */
-      get right() {
-        return this.x + this.width;
-      }
-      /** Returns the top edge of the rectangle. */
-      get top() {
-        return this.y;
-      }
-      /** Returns the bottom edge of the rectangle. */
-      get bottom() {
-        return this.y + this.height;
-      }
-      /** Determines whether the Rectangle is empty. */
-      isEmpty() {
-        return this.left === this.right || this.top === this.bottom;
-      }
-      /** A constant empty rectangle. This is a new object every time the property is accessed */
-      static get EMPTY() {
-        return new Rectangle(0, 0, 0, 0);
-      }
-      /**
-       * Creates a clone of this Rectangle
-       * @returns a copy of the rectangle
-       */
-      clone() {
-        return new Rectangle(this.x, this.y, this.width, this.height);
-      }
-      /**
-       * Converts a Bounds object to a Rectangle object.
-       * @param bounds - The bounds to copy and convert to a rectangle.
-       * @returns Returns itself.
-       */
-      copyFromBounds(bounds) {
-        this.x = bounds.minX;
-        this.y = bounds.minY;
-        this.width = bounds.maxX - bounds.minX;
-        this.height = bounds.maxY - bounds.minY;
-        return this;
-      }
-      /**
-       * Copies another rectangle to this one.
-       * @param rectangle - The rectangle to copy from.
-       * @returns Returns itself.
-       */
-      copyFrom(rectangle) {
-        this.x = rectangle.x;
-        this.y = rectangle.y;
-        this.width = rectangle.width;
-        this.height = rectangle.height;
-        return this;
-      }
-      /**
-       * Copies this rectangle to another one.
-       * @param rectangle - The rectangle to copy to.
-       * @returns Returns given parameter.
-       */
-      copyTo(rectangle) {
-        rectangle.copyFrom(this);
-        return rectangle;
-      }
-      /**
-       * Checks whether the x and y coordinates given are contained within this Rectangle
-       * @param x - The X coordinate of the point to test
-       * @param y - The Y coordinate of the point to test
-       * @returns Whether the x/y coordinates are within this Rectangle
-       */
-      contains(x, y) {
-        if (this.width <= 0 || this.height <= 0) {
-          return false;
-        }
-        if (x >= this.x && x < this.x + this.width) {
-          if (y >= this.y && y < this.y + this.height) {
-            return true;
-          }
-        }
-        return false;
-      }
-      strokeContains(x, y, strokeWidth) {
-        const { width, height } = this;
-        if (width <= 0 || height <= 0)
-          return false;
-        const _x = this.x;
-        const _y = this.y;
-        const outerLeft = _x - strokeWidth / 2;
-        const outerRight = _x + width + strokeWidth / 2;
-        const outerTop = _y - strokeWidth / 2;
-        const outerBottom = _y + height + strokeWidth / 2;
-        const innerLeft = _x + strokeWidth / 2;
-        const innerRight = _x + width - strokeWidth / 2;
-        const innerTop = _y + strokeWidth / 2;
-        const innerBottom = _y + height - strokeWidth / 2;
-        return x >= outerLeft && x <= outerRight && y >= outerTop && y <= outerBottom && !(x > innerLeft && x < innerRight && y > innerTop && y < innerBottom);
-      }
-      /**
-       * Determines whether the `other` Rectangle transformed by `transform` intersects with `this` Rectangle object.
-       * Returns true only if the area of the intersection is >0, this means that Rectangles
-       * sharing a side are not overlapping. Another side effect is that an arealess rectangle
-       * (width or height equal to zero) can't intersect any other rectangle.
-       * @param {Rectangle} other - The Rectangle to intersect with `this`.
-       * @param {Matrix} transform - The transformation matrix of `other`.
-       * @returns {boolean} A value of `true` if the transformed `other` Rectangle intersects with `this`; otherwise `false`.
-       */
-      intersects(other, transform) {
-        if (!transform) {
-          const x02 = this.x < other.x ? other.x : this.x;
-          const x12 = this.right > other.right ? other.right : this.right;
-          if (x12 <= x02) {
-            return false;
-          }
-          const y02 = this.y < other.y ? other.y : this.y;
-          const y12 = this.bottom > other.bottom ? other.bottom : this.bottom;
-          return y12 > y02;
-        }
-        const x0 = this.left;
-        const x1 = this.right;
-        const y0 = this.top;
-        const y1 = this.bottom;
-        if (x1 <= x0 || y1 <= y0) {
-          return false;
-        }
-        const lt = tempPoints[0].set(other.left, other.top);
-        const lb = tempPoints[1].set(other.left, other.bottom);
-        const rt = tempPoints[2].set(other.right, other.top);
-        const rb = tempPoints[3].set(other.right, other.bottom);
-        if (rt.x <= lt.x || lb.y <= lt.y) {
-          return false;
-        }
-        const s = Math.sign(transform.a * transform.d - transform.b * transform.c);
-        if (s === 0) {
-          return false;
-        }
-        transform.apply(lt, lt);
-        transform.apply(lb, lb);
-        transform.apply(rt, rt);
-        transform.apply(rb, rb);
-        if (Math.max(lt.x, lb.x, rt.x, rb.x) <= x0 || Math.min(lt.x, lb.x, rt.x, rb.x) >= x1 || Math.max(lt.y, lb.y, rt.y, rb.y) <= y0 || Math.min(lt.y, lb.y, rt.y, rb.y) >= y1) {
-          return false;
-        }
-        const nx = s * (lb.y - lt.y);
-        const ny = s * (lt.x - lb.x);
-        const n00 = nx * x0 + ny * y0;
-        const n10 = nx * x1 + ny * y0;
-        const n01 = nx * x0 + ny * y1;
-        const n11 = nx * x1 + ny * y1;
-        if (Math.max(n00, n10, n01, n11) <= nx * lt.x + ny * lt.y || Math.min(n00, n10, n01, n11) >= nx * rb.x + ny * rb.y) {
-          return false;
-        }
-        const mx = s * (lt.y - rt.y);
-        const my = s * (rt.x - lt.x);
-        const m00 = mx * x0 + my * y0;
-        const m10 = mx * x1 + my * y0;
-        const m01 = mx * x0 + my * y1;
-        const m11 = mx * x1 + my * y1;
-        if (Math.max(m00, m10, m01, m11) <= mx * lt.x + my * lt.y || Math.min(m00, m10, m01, m11) >= mx * rb.x + my * rb.y) {
-          return false;
-        }
-        return true;
-      }
-      /**
-       * Pads the rectangle making it grow in all directions.
-       * If paddingY is omitted, both paddingX and paddingY will be set to paddingX.
-       * @param paddingX - The horizontal padding amount.
-       * @param paddingY - The vertical padding amount.
-       * @returns Returns itself.
-       */
-      pad(paddingX = 0, paddingY = paddingX) {
-        this.x -= paddingX;
-        this.y -= paddingY;
-        this.width += paddingX * 2;
-        this.height += paddingY * 2;
-        return this;
-      }
-      /**
-       * Fits this rectangle around the passed one.
-       * @param rectangle - The rectangle to fit.
-       * @returns Returns itself.
-       */
-      fit(rectangle) {
-        const x1 = Math.max(this.x, rectangle.x);
-        const x2 = Math.min(this.x + this.width, rectangle.x + rectangle.width);
-        const y1 = Math.max(this.y, rectangle.y);
-        const y2 = Math.min(this.y + this.height, rectangle.y + rectangle.height);
-        this.x = x1;
-        this.width = Math.max(x2 - x1, 0);
-        this.y = y1;
-        this.height = Math.max(y2 - y1, 0);
-        return this;
-      }
-      /**
-       * Enlarges rectangle that way its corners lie on grid
-       * @param resolution - resolution
-       * @param eps - precision
-       * @returns Returns itself.
-       */
-      ceil(resolution = 1, eps = 1e-3) {
-        const x2 = Math.ceil((this.x + this.width - eps) * resolution) / resolution;
-        const y2 = Math.ceil((this.y + this.height - eps) * resolution) / resolution;
-        this.x = Math.floor((this.x + eps) * resolution) / resolution;
-        this.y = Math.floor((this.y + eps) * resolution) / resolution;
-        this.width = x2 - this.x;
-        this.height = y2 - this.y;
-        return this;
-      }
-      /**
-       * Enlarges this rectangle to include the passed rectangle.
-       * @param rectangle - The rectangle to include.
-       * @returns Returns itself.
-       */
-      enlarge(rectangle) {
-        const x1 = Math.min(this.x, rectangle.x);
-        const x2 = Math.max(this.x + this.width, rectangle.x + rectangle.width);
-        const y1 = Math.min(this.y, rectangle.y);
-        const y2 = Math.max(this.y + this.height, rectangle.y + rectangle.height);
-        this.x = x1;
-        this.width = x2 - x1;
-        this.y = y1;
-        this.height = y2 - y1;
-        return this;
-      }
-      /**
-       * Returns the framing rectangle of the rectangle as a Rectangle object
-       * @param out - optional rectangle to store the result
-       * @returns The framing rectangle
-       */
-      getBounds(out) {
-        out = out || new Rectangle();
-        out.copyFrom(this);
-        return out;
-      }
-      toString() {
-        return `[pixi.js/math:Rectangle x=${this.x} y=${this.y} width=${this.width} height=${this.height}]`;
-      }
-    }
-
-    "use strict";
     const defaultMatrix = new Matrix();
     class Bounds {
       constructor(minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity) {
@@ -2843,20 +11307,6 @@ Deprecated since v${version}`);
         parentTransform.append(parent.localTransform);
       }
       return parentTransform;
-    }
-
-    "use strict";
-    let warnCount = 0;
-    const maxWarnings = 500;
-    function warn(...args) {
-      if (warnCount === maxWarnings)
-        return;
-      warnCount++;
-      if (warnCount === maxWarnings) {
-        console.warn("PixiJS Warning: too many warnings, no more warnings will be reported to the console by PixiJS.");
-      } else {
-        console.warn("PixiJS Warning: ", ...args);
-      }
     }
 
     "use strict";
@@ -4018,6196 +12468,6 @@ Deprecated since v${version}`);
     Container.mixin(findMixin);
     Container.mixin(sortMixin);
     Container.mixin(cullingMixin);
-
-    "use strict";
-    class FederatedEvent {
-      /**
-       * @param manager - The event boundary which manages this event. Propagation can only occur
-       *  within the boundary's jurisdiction.
-       */
-      constructor(manager) {
-        /** Flags whether this event bubbles. This will take effect only if it is set before propagation. */
-        this.bubbles = true;
-        /** @deprecated since 7.0.0 */
-        this.cancelBubble = true;
-        /**
-         * Flags whether this event can be canceled using {@link FederatedEvent.preventDefault}. This is always
-         * false (for now).
-         */
-        this.cancelable = false;
-        /**
-         * Flag added for compatibility with DOM {@code Event}. It is not used in the Federated Events
-         * API.
-         * @see https://dom.spec.whatwg.org/#dom-event-composed
-         */
-        this.composed = false;
-        /** Flags whether the default response of the user agent was prevent through this event. */
-        this.defaultPrevented = false;
-        /**
-         * The propagation phase.
-         * @default {@link FederatedEvent.NONE}
-         */
-        this.eventPhase = FederatedEvent.prototype.NONE;
-        /** Flags whether propagation was stopped. */
-        this.propagationStopped = false;
-        /** Flags whether propagation was immediately stopped. */
-        this.propagationImmediatelyStopped = false;
-        /** The coordinates of the event relative to the nearest DOM layer. This is a non-standard property. */
-        this.layer = new Point();
-        /** The coordinates of the event relative to the DOM document. This is a non-standard property. */
-        this.page = new Point();
-        this.NONE = 0;
-        this.CAPTURING_PHASE = 1;
-        this.AT_TARGET = 2;
-        this.BUBBLING_PHASE = 3;
-        this.manager = manager;
-      }
-      /** @readonly */
-      get layerX() {
-        return this.layer.x;
-      }
-      /** @readonly */
-      get layerY() {
-        return this.layer.y;
-      }
-      /** @readonly */
-      get pageX() {
-        return this.page.x;
-      }
-      /** @readonly */
-      get pageY() {
-        return this.page.y;
-      }
-      /**
-       * Fallback for the deprecated @code{InteractionEvent.data}.
-       * @deprecated since 7.0.0
-       */
-      get data() {
-        return this;
-      }
-      /** The propagation path for this event. Alias for {@link EventBoundary.propagationPath}. */
-      composedPath() {
-        if (this.manager && (!this.path || this.path[this.path.length - 1] !== this.target)) {
-          this.path = this.target ? this.manager.propagationPath(this.target) : [];
-        }
-        return this.path;
-      }
-      /**
-       * Unimplemented method included for implementing the DOM interface {@code Event}. It will throw an {@code Error}.
-       * @deprecated
-       * @param _type
-       * @param _bubbles
-       * @param _cancelable
-       */
-      initEvent(_type, _bubbles, _cancelable) {
-        throw new Error("initEvent() is a legacy DOM API. It is not implemented in the Federated Events API.");
-      }
-      /**
-       * Unimplemented method included for implementing the DOM interface {@code UIEvent}. It will throw an {@code Error}.
-       * @deprecated
-       * @param _typeArg
-       * @param _bubblesArg
-       * @param _cancelableArg
-       * @param _viewArg
-       * @param _detailArg
-       */
-      initUIEvent(_typeArg, _bubblesArg, _cancelableArg, _viewArg, _detailArg) {
-        throw new Error("initUIEvent() is a legacy DOM API. It is not implemented in the Federated Events API.");
-      }
-      /** Prevent default behavior of PixiJS and the user agent. */
-      preventDefault() {
-        if (this.nativeEvent instanceof Event && this.nativeEvent.cancelable) {
-          this.nativeEvent.preventDefault();
-        }
-        this.defaultPrevented = true;
-      }
-      /**
-       * Stop this event from propagating to any addition listeners, including on the
-       * {@link FederatedEventTarget.currentTarget currentTarget} and also the following
-       * event targets on the propagation path.
-       */
-      stopImmediatePropagation() {
-        this.propagationImmediatelyStopped = true;
-      }
-      /**
-       * Stop this event from propagating to the next {@link FederatedEventTarget}. The rest of the listeners
-       * on the {@link FederatedEventTarget.currentTarget currentTarget} will still be notified.
-       */
-      stopPropagation() {
-        this.propagationStopped = true;
-      }
-    }
-
-    var appleIphone = /iPhone/i;
-    var appleIpod = /iPod/i;
-    var appleTablet = /iPad/i;
-    var appleUniversal = /\biOS-universal(?:.+)Mac\b/i;
-    var androidPhone = /\bAndroid(?:.+)Mobile\b/i;
-    var androidTablet = /Android/i;
-    var amazonPhone = /(?:SD4930UR|\bSilk(?:.+)Mobile\b)/i;
-    var amazonTablet = /Silk/i;
-    var windowsPhone = /Windows Phone/i;
-    var windowsTablet = /\bWindows(?:.+)ARM\b/i;
-    var otherBlackBerry = /BlackBerry/i;
-    var otherBlackBerry10 = /BB10/i;
-    var otherOpera = /Opera Mini/i;
-    var otherChrome = /\b(CriOS|Chrome)(?:.+)Mobile/i;
-    var otherFirefox = /Mobile(?:.+)Firefox\b/i;
-    var isAppleTabletOnIos13 = function (navigator) {
-        return (typeof navigator !== 'undefined' &&
-            navigator.platform === 'MacIntel' &&
-            typeof navigator.maxTouchPoints === 'number' &&
-            navigator.maxTouchPoints > 1 &&
-            typeof MSStream === 'undefined');
-    };
-    function createMatch(userAgent) {
-        return function (regex) { return regex.test(userAgent); };
-    }
-    function isMobile$1(param) {
-        var nav = {
-            userAgent: '',
-            platform: '',
-            maxTouchPoints: 0
-        };
-        if (!param && typeof navigator !== 'undefined') {
-            nav = {
-                userAgent: navigator.userAgent,
-                platform: navigator.platform,
-                maxTouchPoints: navigator.maxTouchPoints || 0
-            };
-        }
-        else if (typeof param === 'string') {
-            nav.userAgent = param;
-        }
-        else if (param && param.userAgent) {
-            nav = {
-                userAgent: param.userAgent,
-                platform: param.platform,
-                maxTouchPoints: param.maxTouchPoints || 0
-            };
-        }
-        var userAgent = nav.userAgent;
-        var tmp = userAgent.split('[FBAN');
-        if (typeof tmp[1] !== 'undefined') {
-            userAgent = tmp[0];
-        }
-        tmp = userAgent.split('Twitter');
-        if (typeof tmp[1] !== 'undefined') {
-            userAgent = tmp[0];
-        }
-        var match = createMatch(userAgent);
-        var result = {
-            apple: {
-                phone: match(appleIphone) && !match(windowsPhone),
-                ipod: match(appleIpod),
-                tablet: !match(appleIphone) &&
-                    (match(appleTablet) || isAppleTabletOnIos13(nav)) &&
-                    !match(windowsPhone),
-                universal: match(appleUniversal),
-                device: (match(appleIphone) ||
-                    match(appleIpod) ||
-                    match(appleTablet) ||
-                    match(appleUniversal) ||
-                    isAppleTabletOnIos13(nav)) &&
-                    !match(windowsPhone)
-            },
-            amazon: {
-                phone: match(amazonPhone),
-                tablet: !match(amazonPhone) && match(amazonTablet),
-                device: match(amazonPhone) || match(amazonTablet)
-            },
-            android: {
-                phone: (!match(windowsPhone) && match(amazonPhone)) ||
-                    (!match(windowsPhone) && match(androidPhone)),
-                tablet: !match(windowsPhone) &&
-                    !match(amazonPhone) &&
-                    !match(androidPhone) &&
-                    (match(amazonTablet) || match(androidTablet)),
-                device: (!match(windowsPhone) &&
-                    (match(amazonPhone) ||
-                        match(amazonTablet) ||
-                        match(androidPhone) ||
-                        match(androidTablet))) ||
-                    match(/\bokhttp\b/i)
-            },
-            windows: {
-                phone: match(windowsPhone),
-                tablet: match(windowsTablet),
-                device: match(windowsPhone) || match(windowsTablet)
-            },
-            other: {
-                blackberry: match(otherBlackBerry),
-                blackberry10: match(otherBlackBerry10),
-                opera: match(otherOpera),
-                firefox: match(otherFirefox),
-                chrome: match(otherChrome),
-                device: match(otherBlackBerry) ||
-                    match(otherBlackBerry10) ||
-                    match(otherOpera) ||
-                    match(otherFirefox) ||
-                    match(otherChrome)
-            },
-            any: false,
-            phone: false,
-            tablet: false
-        };
-        result.any =
-            result.apple.device ||
-                result.android.device ||
-                result.windows.device ||
-                result.other.device;
-        result.phone =
-            result.apple.phone || result.android.phone || result.windows.phone;
-        result.tablet =
-            result.apple.tablet || result.android.tablet || result.windows.tablet;
-        return result;
-    }
-
-    "use strict";
-    var _a;
-    const isMobileCall = (_a = isMobile$1.default) != null ? _a : isMobile$1;
-    const isMobile = isMobileCall(globalThis.navigator);
-
-    "use strict";
-    const KEY_CODE_TAB = 9;
-    const DIV_TOUCH_SIZE = 100;
-    const DIV_TOUCH_POS_X = 0;
-    const DIV_TOUCH_POS_Y = 0;
-    const DIV_TOUCH_ZINDEX = 2;
-    const DIV_HOOK_SIZE = 1;
-    const DIV_HOOK_POS_X = -1e3;
-    const DIV_HOOK_POS_Y = -1e3;
-    const DIV_HOOK_ZINDEX = 2;
-    class AccessibilitySystem {
-      // 2fps
-      // eslint-disable-next-line jsdoc/require-param
-      /**
-       * @param {WebGLRenderer|WebGPURenderer} renderer - A reference to the current renderer
-       */
-      constructor(renderer, _mobileInfo = isMobile) {
-        this._mobileInfo = _mobileInfo;
-        /** Setting this to true will visually show the divs. */
-        this.debug = false;
-        /** Internal variable, see isActive getter. */
-        this._isActive = false;
-        /** Internal variable, see isMobileAccessibility getter. */
-        this._isMobileAccessibility = false;
-        /** A simple pool for storing divs. */
-        this._pool = [];
-        /** This is a tick used to check if an object is no longer being rendered. */
-        this._renderId = 0;
-        /** The array of currently active accessible items. */
-        this._children = [];
-        /** Count to throttle div updates on android devices. */
-        this._androidUpdateCount = 0;
-        /**  The frequency to update the div elements. */
-        this._androidUpdateFrequency = 500;
-        this._hookDiv = null;
-        if (_mobileInfo.tablet || _mobileInfo.phone) {
-          this._createTouchHook();
-        }
-        const div = document.createElement("div");
-        div.style.width = `${DIV_TOUCH_SIZE}px`;
-        div.style.height = `${DIV_TOUCH_SIZE}px`;
-        div.style.position = "absolute";
-        div.style.top = `${DIV_TOUCH_POS_X}px`;
-        div.style.left = `${DIV_TOUCH_POS_Y}px`;
-        div.style.zIndex = DIV_TOUCH_ZINDEX.toString();
-        this._div = div;
-        this._renderer = renderer;
-        this._onKeyDown = this._onKeyDown.bind(this);
-        this._onMouseMove = this._onMouseMove.bind(this);
-        globalThis.addEventListener("keydown", this._onKeyDown, false);
-      }
-      /**
-       * Value of `true` if accessibility is currently active and accessibility layers are showing.
-       * @member {boolean}
-       * @readonly
-       */
-      get isActive() {
-        return this._isActive;
-      }
-      /**
-       * Value of `true` if accessibility is enabled for touch devices.
-       * @member {boolean}
-       * @readonly
-       */
-      get isMobileAccessibility() {
-        return this._isMobileAccessibility;
-      }
-      get hookDiv() {
-        return this._hookDiv;
-      }
-      /**
-       * Creates the touch hooks.
-       * @private
-       */
-      _createTouchHook() {
-        const hookDiv = document.createElement("button");
-        hookDiv.style.width = `${DIV_HOOK_SIZE}px`;
-        hookDiv.style.height = `${DIV_HOOK_SIZE}px`;
-        hookDiv.style.position = "absolute";
-        hookDiv.style.top = `${DIV_HOOK_POS_X}px`;
-        hookDiv.style.left = `${DIV_HOOK_POS_Y}px`;
-        hookDiv.style.zIndex = DIV_HOOK_ZINDEX.toString();
-        hookDiv.style.backgroundColor = "#FF0000";
-        hookDiv.title = "select to enable accessibility for this content";
-        hookDiv.addEventListener("focus", () => {
-          this._isMobileAccessibility = true;
-          this._activate();
-          this._destroyTouchHook();
-        });
-        document.body.appendChild(hookDiv);
-        this._hookDiv = hookDiv;
-      }
-      /**
-       * Destroys the touch hooks.
-       * @private
-       */
-      _destroyTouchHook() {
-        if (!this._hookDiv) {
-          return;
-        }
-        document.body.removeChild(this._hookDiv);
-        this._hookDiv = null;
-      }
-      /**
-       * Activating will cause the Accessibility layer to be shown.
-       * This is called when a user presses the tab key.
-       * @private
-       */
-      _activate() {
-        var _a;
-        if (this._isActive) {
-          return;
-        }
-        this._isActive = true;
-        globalThis.document.addEventListener("mousemove", this._onMouseMove, true);
-        globalThis.removeEventListener("keydown", this._onKeyDown, false);
-        this._renderer.runners.postrender.add(this);
-        (_a = this._renderer.view.canvas.parentNode) == null ? void 0 : _a.appendChild(this._div);
-      }
-      /**
-       * Deactivating will cause the Accessibility layer to be hidden.
-       * This is called when a user moves the mouse.
-       * @private
-       */
-      _deactivate() {
-        var _a;
-        if (!this._isActive || this._isMobileAccessibility) {
-          return;
-        }
-        this._isActive = false;
-        globalThis.document.removeEventListener("mousemove", this._onMouseMove, true);
-        globalThis.addEventListener("keydown", this._onKeyDown, false);
-        this._renderer.runners.postrender.remove(this);
-        (_a = this._div.parentNode) == null ? void 0 : _a.removeChild(this._div);
-      }
-      /**
-       * This recursive function will run through the scene graph and add any new accessible objects to the DOM layer.
-       * @private
-       * @param {Container} container - The Container to check.
-       */
-      _updateAccessibleObjects(container) {
-        if (!container.visible || !container.accessibleChildren) {
-          return;
-        }
-        if (container.accessible && container.isInteractive()) {
-          if (!container._accessibleActive) {
-            this._addChild(container);
-          }
-          container._renderId = this._renderId;
-        }
-        const children = container.children;
-        if (children) {
-          for (let i = 0; i < children.length; i++) {
-            this._updateAccessibleObjects(children[i]);
-          }
-        }
-      }
-      /**
-       * Runner init called, view is available at this point.
-       * @ignore
-       */
-      init(options) {
-        var _a;
-        this.debug = (_a = options == null ? void 0 : options.debug) != null ? _a : this.debug;
-        this._renderer.runners.postrender.remove(this);
-      }
-      /**
-       * Runner postrender was called, ensure that all divs are mapped correctly to their Containers.
-       * Only fires while active.
-       * @ignore
-       */
-      postrender() {
-        const now = performance.now();
-        if (this._mobileInfo.android.device && now < this._androidUpdateCount) {
-          return;
-        }
-        this._androidUpdateCount = now + this._androidUpdateFrequency;
-        if (!this._renderer.renderingToScreen || !this._renderer.view.canvas) {
-          return;
-        }
-        if (this._renderer.lastObjectRendered) {
-          this._updateAccessibleObjects(this._renderer.lastObjectRendered);
-        }
-        const { x, y, width, height } = this._renderer.view.canvas.getBoundingClientRect();
-        const { width: viewWidth, height: viewHeight, resolution } = this._renderer;
-        const sx = width / viewWidth * resolution;
-        const sy = height / viewHeight * resolution;
-        let div = this._div;
-        div.style.left = `${x}px`;
-        div.style.top = `${y}px`;
-        div.style.width = `${viewWidth}px`;
-        div.style.height = `${viewHeight}px`;
-        for (let i = 0; i < this._children.length; i++) {
-          const child = this._children[i];
-          if (child._renderId !== this._renderId) {
-            child._accessibleActive = false;
-            removeItems(this._children, i, 1);
-            this._div.removeChild(child._accessibleDiv);
-            this._pool.push(child._accessibleDiv);
-            child._accessibleDiv = null;
-            i--;
-          } else {
-            div = child._accessibleDiv;
-            let hitArea = child.hitArea;
-            const wt = child.worldTransform;
-            if (child.hitArea) {
-              div.style.left = `${(wt.tx + hitArea.x * wt.a) * sx}px`;
-              div.style.top = `${(wt.ty + hitArea.y * wt.d) * sy}px`;
-              div.style.width = `${hitArea.width * wt.a * sx}px`;
-              div.style.height = `${hitArea.height * wt.d * sy}px`;
-            } else {
-              hitArea = child.getBounds().rectangle;
-              this._capHitArea(hitArea);
-              div.style.left = `${hitArea.x * sx}px`;
-              div.style.top = `${hitArea.y * sy}px`;
-              div.style.width = `${hitArea.width * sx}px`;
-              div.style.height = `${hitArea.height * sy}px`;
-              if (div.title !== child.accessibleTitle && child.accessibleTitle !== null) {
-                div.title = child.accessibleTitle;
-              }
-              if (div.getAttribute("aria-label") !== child.accessibleHint && child.accessibleHint !== null) {
-                div.setAttribute("aria-label", child.accessibleHint);
-              }
-            }
-            if (child.accessibleTitle !== div.title || child.tabIndex !== div.tabIndex) {
-              div.title = child.accessibleTitle;
-              div.tabIndex = child.tabIndex;
-              if (this.debug) {
-                this._updateDebugHTML(div);
-              }
-            }
-          }
-        }
-        this._renderId++;
-      }
-      /**
-       * private function that will visually add the information to the
-       * accessibility div
-       * @param {HTMLElement} div -
-       */
-      _updateDebugHTML(div) {
-        div.innerHTML = `type: ${div.type}</br> title : ${div.title}</br> tabIndex: ${div.tabIndex}`;
-      }
-      /**
-       * Adjust the hit area based on the bounds of a display object
-       * @param {Rectangle} hitArea - Bounds of the child
-       */
-      _capHitArea(hitArea) {
-        if (hitArea.x < 0) {
-          hitArea.width += hitArea.x;
-          hitArea.x = 0;
-        }
-        if (hitArea.y < 0) {
-          hitArea.height += hitArea.y;
-          hitArea.y = 0;
-        }
-        const { width: viewWidth, height: viewHeight } = this._renderer;
-        if (hitArea.x + hitArea.width > viewWidth) {
-          hitArea.width = viewWidth - hitArea.x;
-        }
-        if (hitArea.y + hitArea.height > viewHeight) {
-          hitArea.height = viewHeight - hitArea.y;
-        }
-      }
-      /**
-       * Adds a Container to the accessibility manager
-       * @private
-       * @param {Container} container - The child to make accessible.
-       */
-      _addChild(container) {
-        let div = this._pool.pop();
-        if (!div) {
-          div = document.createElement("button");
-          div.style.width = `${DIV_TOUCH_SIZE}px`;
-          div.style.height = `${DIV_TOUCH_SIZE}px`;
-          div.style.backgroundColor = this.debug ? "rgba(255,255,255,0.5)" : "transparent";
-          div.style.position = "absolute";
-          div.style.zIndex = DIV_TOUCH_ZINDEX.toString();
-          div.style.borderStyle = "none";
-          if (navigator.userAgent.toLowerCase().includes("chrome")) {
-            div.setAttribute("aria-live", "off");
-          } else {
-            div.setAttribute("aria-live", "polite");
-          }
-          if (navigator.userAgent.match(/rv:.*Gecko\//)) {
-            div.setAttribute("aria-relevant", "additions");
-          } else {
-            div.setAttribute("aria-relevant", "text");
-          }
-          div.addEventListener("click", this._onClick.bind(this));
-          div.addEventListener("focus", this._onFocus.bind(this));
-          div.addEventListener("focusout", this._onFocusOut.bind(this));
-        }
-        div.style.pointerEvents = container.accessiblePointerEvents;
-        div.type = container.accessibleType;
-        if (container.accessibleTitle && container.accessibleTitle !== null) {
-          div.title = container.accessibleTitle;
-        } else if (!container.accessibleHint || container.accessibleHint === null) {
-          div.title = `container ${container.tabIndex}`;
-        }
-        if (container.accessibleHint && container.accessibleHint !== null) {
-          div.setAttribute("aria-label", container.accessibleHint);
-        }
-        if (this.debug) {
-          this._updateDebugHTML(div);
-        }
-        container._accessibleActive = true;
-        container._accessibleDiv = div;
-        div.container = container;
-        this._children.push(container);
-        this._div.appendChild(container._accessibleDiv);
-        container._accessibleDiv.tabIndex = container.tabIndex;
-      }
-      /**
-       * Dispatch events with the EventSystem.
-       * @param e
-       * @param type
-       * @private
-       */
-      _dispatchEvent(e, type) {
-        const { container: target } = e.target;
-        const boundary = this._renderer.events.rootBoundary;
-        const event = Object.assign(new FederatedEvent(boundary), { target });
-        boundary.rootTarget = this._renderer.lastObjectRendered;
-        type.forEach((type2) => boundary.dispatchEvent(event, type2));
-      }
-      /**
-       * Maps the div button press to pixi's EventSystem (click)
-       * @private
-       * @param {MouseEvent} e - The click event.
-       */
-      _onClick(e) {
-        this._dispatchEvent(e, ["click", "pointertap", "tap"]);
-      }
-      /**
-       * Maps the div focus events to pixi's EventSystem (mouseover)
-       * @private
-       * @param {FocusEvent} e - The focus event.
-       */
-      _onFocus(e) {
-        if (!e.target.getAttribute("aria-live")) {
-          e.target.setAttribute("aria-live", "assertive");
-        }
-        this._dispatchEvent(e, ["mouseover"]);
-      }
-      /**
-       * Maps the div focus events to pixi's EventSystem (mouseout)
-       * @private
-       * @param {FocusEvent} e - The focusout event.
-       */
-      _onFocusOut(e) {
-        if (!e.target.getAttribute("aria-live")) {
-          e.target.setAttribute("aria-live", "polite");
-        }
-        this._dispatchEvent(e, ["mouseout"]);
-      }
-      /**
-       * Is called when a key is pressed
-       * @private
-       * @param {KeyboardEvent} e - The keydown event.
-       */
-      _onKeyDown(e) {
-        if (e.keyCode !== KEY_CODE_TAB) {
-          return;
-        }
-        this._activate();
-      }
-      /**
-       * Is called when the mouse moves across the renderer element
-       * @private
-       * @param {MouseEvent} e - The mouse event.
-       */
-      _onMouseMove(e) {
-        if (e.movementX === 0 && e.movementY === 0) {
-          return;
-        }
-        this._deactivate();
-      }
-      /** Destroys the accessibility manager */
-      destroy() {
-        this._destroyTouchHook();
-        this._div = null;
-        globalThis.document.removeEventListener("mousemove", this._onMouseMove, true);
-        globalThis.removeEventListener("keydown", this._onKeyDown);
-        this._pool = null;
-        this._children = null;
-        this._renderer = null;
-      }
-    }
-    /** @ignore */
-    AccessibilitySystem.extension = {
-      type: [
-        ExtensionType.WebGLSystem,
-        ExtensionType.WebGPUSystem
-      ],
-      name: "accessibility"
-    };
-
-    "use strict";
-    const accessibilityTarget = {
-      /**
-       * Flag for if the object is accessible. If true AccessibilityManager will overlay a
-       * shadow div with attributes set
-       * @member {boolean}
-       * @memberof scene.Container#
-       */
-      accessible: false,
-      /**
-       * Sets the title attribute of the shadow div
-       * If accessibleTitle AND accessibleHint has not been this will default to 'container [tabIndex]'
-       * @member {string}
-       * @memberof scene.Container#
-       */
-      accessibleTitle: null,
-      /**
-       * Sets the aria-label attribute of the shadow div
-       * @member {string}
-       * @memberof scene.Container#
-       */
-      accessibleHint: null,
-      /**
-       * @member {number}
-       * @memberof scene.Container#
-       * @todo Needs docs.
-       */
-      tabIndex: 0,
-      /**
-       * @member {boolean}
-       * @memberof scene.Container#
-       * @private
-       */
-      _accessibleActive: false,
-      /**
-       * @memberof scene.Container#
-       * @private
-       */
-      _accessibleDiv: null,
-      /**
-       * Specify the type of div the accessible layer is. Screen readers treat the element differently
-       * depending on this type. Defaults to button.
-       * @member {string}
-       * @memberof scene.Container#
-       * @default 'button'
-       */
-      accessibleType: "button",
-      /**
-       * Specify the pointer-events the accessible div will use
-       * Defaults to auto.
-       * @type {PointerEvents}
-       * @memberof scene.Container#
-       * @default 'auto'
-       */
-      accessiblePointerEvents: "auto",
-      /**
-       * Setting to false will prevent any children inside this container to
-       * be accessible. Defaults to true.
-       * @member {boolean}
-       * @memberof scene.Container#
-       * @default true
-       */
-      accessibleChildren: true,
-      /**
-       * @member {number}
-       * @memberof scene.Container#
-       * @private
-       */
-      _renderId: -1
-    };
-
-    "use strict";
-    extensions.add(AccessibilitySystem);
-    Container.mixin(accessibilityTarget);
-
-    "use strict";
-    class ResizePlugin {
-      /**
-       * Initialize the plugin with scope of application instance
-       * @static
-       * @private
-       * @param {object} [options] - See application options
-       */
-      static init(options) {
-        Object.defineProperty(
-          this,
-          "resizeTo",
-          /**
-           * The HTML element or window to automatically resize the
-           * renderer's view element to match width and height.
-           * @member {Window|HTMLElement}
-           * @name resizeTo
-           * @memberof app.Application#
-           */
-          {
-            set(dom) {
-              globalThis.removeEventListener("resize", this.queueResize);
-              this._resizeTo = dom;
-              if (dom) {
-                globalThis.addEventListener("resize", this.queueResize);
-                this.resize();
-              }
-            },
-            get() {
-              return this._resizeTo;
-            }
-          }
-        );
-        this.queueResize = () => {
-          if (!this._resizeTo) {
-            return;
-          }
-          this._cancelResize();
-          this._resizeId = requestAnimationFrame(() => this.resize());
-        };
-        this._cancelResize = () => {
-          if (this._resizeId) {
-            cancelAnimationFrame(this._resizeId);
-            this._resizeId = null;
-          }
-        };
-        this.resize = () => {
-          if (!this._resizeTo) {
-            return;
-          }
-          this._cancelResize();
-          let width;
-          let height;
-          if (this._resizeTo === globalThis.window) {
-            width = globalThis.innerWidth;
-            height = globalThis.innerHeight;
-          } else {
-            const { clientWidth, clientHeight } = this._resizeTo;
-            width = clientWidth;
-            height = clientHeight;
-          }
-          this.renderer.resize(width, height);
-          this.render();
-        };
-        this._resizeId = null;
-        this._resizeTo = null;
-        this.resizeTo = options.resizeTo || null;
-      }
-      /**
-       * Clean up the ticker, scoped to application
-       * @static
-       * @private
-       */
-      static destroy() {
-        globalThis.removeEventListener("resize", this.queueResize);
-        this._cancelResize();
-        this._cancelResize = null;
-        this.queueResize = null;
-        this.resizeTo = null;
-        this.resize = null;
-      }
-    }
-    /** @ignore */
-    ResizePlugin.extension = ExtensionType.Application;
-
-    "use strict";
-    var UPDATE_PRIORITY = /* @__PURE__ */ ((UPDATE_PRIORITY2) => {
-      UPDATE_PRIORITY2[UPDATE_PRIORITY2["INTERACTION"] = 50] = "INTERACTION";
-      UPDATE_PRIORITY2[UPDATE_PRIORITY2["HIGH"] = 25] = "HIGH";
-      UPDATE_PRIORITY2[UPDATE_PRIORITY2["NORMAL"] = 0] = "NORMAL";
-      UPDATE_PRIORITY2[UPDATE_PRIORITY2["LOW"] = -25] = "LOW";
-      UPDATE_PRIORITY2[UPDATE_PRIORITY2["UTILITY"] = -50] = "UTILITY";
-      return UPDATE_PRIORITY2;
-    })(UPDATE_PRIORITY || {});
-
-    "use strict";
-    class TickerListener {
-      /**
-       * Constructor
-       * @private
-       * @param fn - The listener function to be added for one update
-       * @param context - The listener context
-       * @param priority - The priority for emitting
-       * @param once - If the handler should fire once
-       */
-      constructor(fn, context = null, priority = 0, once = false) {
-        /** The next item in chain. */
-        this.next = null;
-        /** The previous item in chain. */
-        this.previous = null;
-        /** `true` if this listener has been destroyed already. */
-        this._destroyed = false;
-        this._fn = fn;
-        this._context = context;
-        this.priority = priority;
-        this._once = once;
-      }
-      /**
-       * Simple compare function to figure out if a function and context match.
-       * @param fn - The listener function to be added for one update
-       * @param context - The listener context
-       * @returns `true` if the listener match the arguments
-       */
-      match(fn, context = null) {
-        return this._fn === fn && this._context === context;
-      }
-      /**
-       * Emit by calling the current function.
-       * @param ticker - The ticker emitting.
-       * @returns Next ticker
-       */
-      emit(ticker) {
-        if (this._fn) {
-          if (this._context) {
-            this._fn.call(this._context, ticker);
-          } else {
-            this._fn(ticker);
-          }
-        }
-        const redirect = this.next;
-        if (this._once) {
-          this.destroy(true);
-        }
-        if (this._destroyed) {
-          this.next = null;
-        }
-        return redirect;
-      }
-      /**
-       * Connect to the list.
-       * @param previous - Input node, previous listener
-       */
-      connect(previous) {
-        this.previous = previous;
-        if (previous.next) {
-          previous.next.previous = this;
-        }
-        this.next = previous.next;
-        previous.next = this;
-      }
-      /**
-       * Destroy and don't use after this.
-       * @param hard - `true` to remove the `next` reference, this
-       *        is considered a hard destroy. Soft destroy maintains the next reference.
-       * @returns The listener to redirect while emitting or removing.
-       */
-      destroy(hard = false) {
-        this._destroyed = true;
-        this._fn = null;
-        this._context = null;
-        if (this.previous) {
-          this.previous.next = this.next;
-        }
-        if (this.next) {
-          this.next.previous = this.previous;
-        }
-        const redirect = this.next;
-        this.next = hard ? null : redirect;
-        this.previous = null;
-        return redirect;
-      }
-    }
-
-    "use strict";
-    const _Ticker = class _Ticker {
-      constructor() {
-        /**
-         * Whether or not this ticker should invoke the method
-         * {@link ticker.Ticker#start|start} automatically when a listener is added.
-         */
-        this.autoStart = false;
-        /**
-         * Scalar time value from last frame to this frame.
-         * This value is capped by setting {@link ticker.Ticker#minFPS|minFPS}
-         * and is scaled with {@link ticker.Ticker#speed|speed}.
-         * **Note:** The cap may be exceeded by scaling.
-         */
-        this.deltaTime = 1;
-        /**
-         * The last time {@link ticker.Ticker#update|update} was invoked.
-         * This value is also reset internally outside of invoking
-         * update, but only when a new animation frame is requested.
-         * If the platform supports DOMHighResTimeStamp,
-         * this value will have a precision of 1 µs.
-         */
-        this.lastTime = -1;
-        /**
-         * Factor of current {@link ticker.Ticker#deltaTime|deltaTime}.
-         * @example
-         * // Scales ticker.deltaTime to what would be
-         * // the equivalent of approximately 120 FPS
-         * ticker.speed = 2;
-         */
-        this.speed = 1;
-        /**
-         * Whether or not this ticker has been started.
-         * `true` if {@link ticker.Ticker#start|start} has been called.
-         * `false` if {@link ticker.Ticker#stop|Stop} has been called.
-         * While `false`, this value may change to `true` in the
-         * event of {@link ticker.Ticker#autoStart|autoStart} being `true`
-         * and a listener is added.
-         */
-        this.started = false;
-        /** Internal current frame request ID */
-        this._requestId = null;
-        /**
-         * Internal value managed by minFPS property setter and getter.
-         * This is the maximum allowed milliseconds between updates.
-         */
-        this._maxElapsedMS = 100;
-        /**
-         * Internal value managed by minFPS property setter and getter.
-         * This is the minimum allowed milliseconds between updates.
-         */
-        this._minElapsedMS = 0;
-        /** If enabled, deleting is disabled.*/
-        this._protected = false;
-        /** The last time keyframe was executed. Maintains a relatively fixed interval with the previous value. */
-        this._lastFrame = -1;
-        this._head = new TickerListener(null, null, Infinity);
-        this.deltaMS = 1 / _Ticker.targetFPMS;
-        this.elapsedMS = 1 / _Ticker.targetFPMS;
-        this._tick = (time) => {
-          this._requestId = null;
-          if (this.started) {
-            this.update(time);
-            if (this.started && this._requestId === null && this._head.next) {
-              this._requestId = requestAnimationFrame(this._tick);
-            }
-          }
-        };
-      }
-      /**
-       * Conditionally requests a new animation frame.
-       * If a frame has not already been requested, and if the internal
-       * emitter has listeners, a new frame is requested.
-       * @private
-       */
-      _requestIfNeeded() {
-        if (this._requestId === null && this._head.next) {
-          this.lastTime = performance.now();
-          this._lastFrame = this.lastTime;
-          this._requestId = requestAnimationFrame(this._tick);
-        }
-      }
-      /**
-       * Conditionally cancels a pending animation frame.
-       * @private
-       */
-      _cancelIfNeeded() {
-        if (this._requestId !== null) {
-          cancelAnimationFrame(this._requestId);
-          this._requestId = null;
-        }
-      }
-      /**
-       * Conditionally requests a new animation frame.
-       * If the ticker has been started it checks if a frame has not already
-       * been requested, and if the internal emitter has listeners. If these
-       * conditions are met, a new frame is requested. If the ticker has not
-       * been started, but autoStart is `true`, then the ticker starts now,
-       * and continues with the previous conditions to request a new frame.
-       * @private
-       */
-      _startIfPossible() {
-        if (this.started) {
-          this._requestIfNeeded();
-        } else if (this.autoStart) {
-          this.start();
-        }
-      }
-      /**
-       * Register a handler for tick events. Calls continuously unless
-       * it is removed or the ticker is stopped.
-       * @param fn - The listener function to be added for updates
-       * @param context - The listener context
-       * @param {number} [priority=UPDATE_PRIORITY.NORMAL] - The priority for emitting
-       * @returns This instance of a ticker
-       */
-      add(fn, context, priority = UPDATE_PRIORITY.NORMAL) {
-        return this._addListener(new TickerListener(fn, context, priority));
-      }
-      /**
-       * Add a handler for the tick event which is only execute once.
-       * @param fn - The listener function to be added for one update
-       * @param context - The listener context
-       * @param {number} [priority=UPDATE_PRIORITY.NORMAL] - The priority for emitting
-       * @returns This instance of a ticker
-       */
-      addOnce(fn, context, priority = UPDATE_PRIORITY.NORMAL) {
-        return this._addListener(new TickerListener(fn, context, priority, true));
-      }
-      /**
-       * Internally adds the event handler so that it can be sorted by priority.
-       * Priority allows certain handler (user, AnimatedSprite, Interaction) to be run
-       * before the rendering.
-       * @private
-       * @param listener - Current listener being added.
-       * @returns This instance of a ticker
-       */
-      _addListener(listener) {
-        let current = this._head.next;
-        let previous = this._head;
-        if (!current) {
-          listener.connect(previous);
-        } else {
-          while (current) {
-            if (listener.priority > current.priority) {
-              listener.connect(previous);
-              break;
-            }
-            previous = current;
-            current = current.next;
-          }
-          if (!listener.previous) {
-            listener.connect(previous);
-          }
-        }
-        this._startIfPossible();
-        return this;
-      }
-      /**
-       * Removes any handlers matching the function and context parameters.
-       * If no handlers are left after removing, then it cancels the animation frame.
-       * @param fn - The listener function to be removed
-       * @param context - The listener context to be removed
-       * @returns This instance of a ticker
-       */
-      remove(fn, context) {
-        let listener = this._head.next;
-        while (listener) {
-          if (listener.match(fn, context)) {
-            listener = listener.destroy();
-          } else {
-            listener = listener.next;
-          }
-        }
-        if (!this._head.next) {
-          this._cancelIfNeeded();
-        }
-        return this;
-      }
-      /**
-       * The number of listeners on this ticker, calculated by walking through linked list
-       * @readonly
-       * @member {number}
-       */
-      get count() {
-        if (!this._head) {
-          return 0;
-        }
-        let count = 0;
-        let current = this._head;
-        while (current = current.next) {
-          count++;
-        }
-        return count;
-      }
-      /** Starts the ticker. If the ticker has listeners a new animation frame is requested at this point. */
-      start() {
-        if (!this.started) {
-          this.started = true;
-          this._requestIfNeeded();
-        }
-      }
-      /** Stops the ticker. If the ticker has requested an animation frame it is canceled at this point. */
-      stop() {
-        if (this.started) {
-          this.started = false;
-          this._cancelIfNeeded();
-        }
-      }
-      /** Destroy the ticker and don't use after this. Calling this method removes all references to internal events. */
-      destroy() {
-        if (!this._protected) {
-          this.stop();
-          let listener = this._head.next;
-          while (listener) {
-            listener = listener.destroy(true);
-          }
-          this._head.destroy();
-          this._head = null;
-        }
-      }
-      /**
-       * Triggers an update. An update entails setting the
-       * current {@link ticker.Ticker#elapsedMS|elapsedMS},
-       * the current {@link ticker.Ticker#deltaTime|deltaTime},
-       * invoking all listeners with current deltaTime,
-       * and then finally setting {@link ticker.Ticker#lastTime|lastTime}
-       * with the value of currentTime that was provided.
-       * This method will be called automatically by animation
-       * frame callbacks if the ticker instance has been started
-       * and listeners are added.
-       * @param {number} [currentTime=performance.now()] - the current time of execution
-       */
-      update(currentTime = performance.now()) {
-        let elapsedMS;
-        if (currentTime > this.lastTime) {
-          elapsedMS = this.elapsedMS = currentTime - this.lastTime;
-          if (elapsedMS > this._maxElapsedMS) {
-            elapsedMS = this._maxElapsedMS;
-          }
-          elapsedMS *= this.speed;
-          if (this._minElapsedMS) {
-            const delta = currentTime - this._lastFrame | 0;
-            if (delta < this._minElapsedMS) {
-              return;
-            }
-            this._lastFrame = currentTime - delta % this._minElapsedMS;
-          }
-          this.deltaMS = elapsedMS;
-          this.deltaTime = this.deltaMS * _Ticker.targetFPMS;
-          const head = this._head;
-          let listener = head.next;
-          while (listener) {
-            listener = listener.emit(this);
-          }
-          if (!head.next) {
-            this._cancelIfNeeded();
-          }
-        } else {
-          this.deltaTime = this.deltaMS = this.elapsedMS = 0;
-        }
-        this.lastTime = currentTime;
-      }
-      /**
-       * The frames per second at which this ticker is running.
-       * The default is approximately 60 in most modern browsers.
-       * **Note:** This does not factor in the value of
-       * {@link ticker.Ticker#speed|speed}, which is specific
-       * to scaling {@link ticker.Ticker#deltaTime|deltaTime}.
-       * @member {number}
-       * @readonly
-       */
-      get FPS() {
-        return 1e3 / this.elapsedMS;
-      }
-      /**
-       * Manages the maximum amount of milliseconds allowed to
-       * elapse between invoking {@link ticker.Ticker#update|update}.
-       * This value is used to cap {@link ticker.Ticker#deltaTime|deltaTime},
-       * but does not effect the measured value of {@link ticker.Ticker#FPS|FPS}.
-       * When setting this property it is clamped to a value between
-       * `0` and `Ticker.targetFPMS * 1000`.
-       * @member {number}
-       * @default 10
-       */
-      get minFPS() {
-        return 1e3 / this._maxElapsedMS;
-      }
-      set minFPS(fps) {
-        const minFPS = Math.min(this.maxFPS, fps);
-        const minFPMS = Math.min(Math.max(0, minFPS) / 1e3, _Ticker.targetFPMS);
-        this._maxElapsedMS = 1 / minFPMS;
-      }
-      /**
-       * Manages the minimum amount of milliseconds required to
-       * elapse between invoking {@link ticker.Ticker#update|update}.
-       * This will effect the measured value of {@link ticker.Ticker#FPS|FPS}.
-       * If it is set to `0`, then there is no limit; PixiJS will render as many frames as it can.
-       * Otherwise it will be at least `minFPS`
-       * @member {number}
-       * @default 0
-       */
-      get maxFPS() {
-        if (this._minElapsedMS) {
-          return Math.round(1e3 / this._minElapsedMS);
-        }
-        return 0;
-      }
-      set maxFPS(fps) {
-        if (fps === 0) {
-          this._minElapsedMS = 0;
-        } else {
-          const maxFPS = Math.max(this.minFPS, fps);
-          this._minElapsedMS = 1 / (maxFPS / 1e3);
-        }
-      }
-      /**
-       * The shared ticker instance used by {@link AnimatedSprite} and by
-       * {@link VideoResource} to update animation frames / video textures.
-       *
-       * It may also be used by {@link Application} if created with the `sharedTicker` option property set to true.
-       *
-       * The property {@link ticker.Ticker#autoStart|autoStart} is set to `true` for this instance.
-       * Please follow the examples for usage, including how to opt-out of auto-starting the shared ticker.
-       * @example
-       * import { Ticker } from 'pixi.js';
-       *
-       * const ticker = Ticker.shared;
-       * // Set this to prevent starting this ticker when listeners are added.
-       * // By default this is true only for the Ticker.shared instance.
-       * ticker.autoStart = false;
-       *
-       * // FYI, call this to ensure the ticker is stopped. It should be stopped
-       * // if you have not attempted to render anything yet.
-       * ticker.stop();
-       *
-       * // Call this when you are ready for a running shared ticker.
-       * ticker.start();
-       * @example
-       * import { autoDetectRenderer, Container } from 'pixi.js';
-       *
-       * // You may use the shared ticker to render...
-       * const renderer = autoDetectRenderer();
-       * const stage = new Container();
-       * document.body.appendChild(renderer.view);
-       * ticker.add((time) => renderer.render(stage));
-       *
-       * // Or you can just update it manually.
-       * ticker.autoStart = false;
-       * ticker.stop();
-       * const animate = (time) => {
-       *     ticker.update(time);
-       *     renderer.render(stage);
-       *     requestAnimationFrame(animate);
-       * };
-       * animate(performance.now());
-       * @member {ticker.Ticker}
-       * @readonly
-       * @static
-       */
-      static get shared() {
-        if (!_Ticker._shared) {
-          const shared = _Ticker._shared = new _Ticker();
-          shared.autoStart = true;
-          shared._protected = true;
-        }
-        return _Ticker._shared;
-      }
-      /**
-       * The system ticker instance used by {@link BasePrepare} for core timing
-       * functionality that shouldn't usually need to be paused, unlike the `shared`
-       * ticker which drives visual animations and rendering which may want to be paused.
-       *
-       * The property {@link ticker.Ticker#autoStart|autoStart} is set to `true` for this instance.
-       * @member {ticker.Ticker}
-       * @readonly
-       * @static
-       */
-      static get system() {
-        if (!_Ticker._system) {
-          const system = _Ticker._system = new _Ticker();
-          system.autoStart = true;
-          system._protected = true;
-        }
-        return _Ticker._system;
-      }
-    };
-    /**
-     * Target frames per millisecond.
-     * @static
-     */
-    _Ticker.targetFPMS = 0.06;
-    let Ticker = _Ticker;
-
-    "use strict";
-    class TickerPlugin {
-      /**
-       * Initialize the plugin with scope of application instance
-       * @static
-       * @private
-       * @param {object} [options] - See application options
-       */
-      static init(options) {
-        options = Object.assign({
-          autoStart: true,
-          sharedTicker: false
-        }, options);
-        Object.defineProperty(
-          this,
-          "ticker",
-          {
-            set(ticker) {
-              if (this._ticker) {
-                this._ticker.remove(this.render, this);
-              }
-              this._ticker = ticker;
-              if (ticker) {
-                ticker.add(this.render, this, UPDATE_PRIORITY.LOW);
-              }
-            },
-            get() {
-              return this._ticker;
-            }
-          }
-        );
-        this.stop = () => {
-          this._ticker.stop();
-        };
-        this.start = () => {
-          this._ticker.start();
-        };
-        this._ticker = null;
-        this.ticker = options.sharedTicker ? Ticker.shared : new Ticker();
-        if (options.autoStart) {
-          this.start();
-        }
-      }
-      /**
-       * Clean up the ticker, scoped to application.
-       * @static
-       * @private
-       */
-      static destroy() {
-        if (this._ticker) {
-          const oldTicker = this._ticker;
-          this.ticker = null;
-          oldTicker.destroy();
-        }
-      }
-    }
-    /** @ignore */
-    TickerPlugin.extension = ExtensionType.Application;
-
-    "use strict";
-    extensions.add(ResizePlugin);
-    extensions.add(TickerPlugin);
-
-    "use strict";
-    class EventsTickerClass {
-      constructor() {
-        /** The frequency that fake events will be fired. */
-        this.interactionFrequency = 10;
-        this._deltaTime = 0;
-        this._didMove = false;
-        this._tickerAdded = false;
-        this._pauseUpdate = true;
-      }
-      /**
-       * Initializes the event ticker.
-       * @param events - The event system.
-       */
-      init(events) {
-        this.removeTickerListener();
-        this.events = events;
-        this.interactionFrequency = 10;
-        this._deltaTime = 0;
-        this._didMove = false;
-        this._tickerAdded = false;
-        this._pauseUpdate = true;
-      }
-      /** Whether to pause the update checks or not. */
-      get pauseUpdate() {
-        return this._pauseUpdate;
-      }
-      set pauseUpdate(paused) {
-        this._pauseUpdate = paused;
-      }
-      /** Adds the ticker listener. */
-      addTickerListener() {
-        if (this._tickerAdded || !this.domElement) {
-          return;
-        }
-        Ticker.system.add(this._tickerUpdate, this, UPDATE_PRIORITY.INTERACTION);
-        this._tickerAdded = true;
-      }
-      /** Removes the ticker listener. */
-      removeTickerListener() {
-        if (!this._tickerAdded) {
-          return;
-        }
-        Ticker.system.remove(this._tickerUpdate, this);
-        this._tickerAdded = false;
-      }
-      /** Sets flag to not fire extra events when the user has already moved there mouse */
-      pointerMoved() {
-        this._didMove = true;
-      }
-      /** Updates the state of interactive objects. */
-      _update() {
-        if (!this.domElement || this._pauseUpdate) {
-          return;
-        }
-        if (this._didMove) {
-          this._didMove = false;
-          return;
-        }
-        const rootPointerEvent = this.events["_rootPointerEvent"];
-        if (this.events.supportsTouchEvents && rootPointerEvent.pointerType === "touch") {
-          return;
-        }
-        globalThis.document.dispatchEvent(new PointerEvent("pointermove", {
-          clientX: rootPointerEvent.clientX,
-          clientY: rootPointerEvent.clientY
-        }));
-      }
-      /**
-       * Updates the state of interactive objects if at least {@link interactionFrequency}
-       * milliseconds have passed since the last invocation.
-       *
-       * Invoked by a throttled ticker update from {@link Ticker.system}.
-       * @param ticker - The throttled ticker.
-       */
-      _tickerUpdate(ticker) {
-        this._deltaTime += ticker.deltaTime;
-        if (this._deltaTime < this.interactionFrequency) {
-          return;
-        }
-        this._deltaTime = 0;
-        this._update();
-      }
-    }
-    const EventsTicker = new EventsTickerClass();
-
-    "use strict";
-    class FederatedMouseEvent extends FederatedEvent {
-      constructor() {
-        super(...arguments);
-        /** The coordinates of the mouse event relative to the canvas. */
-        this.client = new Point();
-        /** The movement in this pointer relative to the last `mousemove` event. */
-        this.movement = new Point();
-        /** The offset of the pointer coordinates w.r.t. target Container in world space. This is not supported at the moment. */
-        this.offset = new Point();
-        /** The pointer coordinates in world space. */
-        this.global = new Point();
-        /**
-         * The pointer coordinates in the renderer's {@link Renderer.screen screen}. This has slightly
-         * different semantics than native PointerEvent screenX/screenY.
-         */
-        this.screen = new Point();
-      }
-      /** @readonly */
-      get clientX() {
-        return this.client.x;
-      }
-      /** @readonly */
-      get clientY() {
-        return this.client.y;
-      }
-      /**
-       * Alias for {@link FederatedMouseEvent.clientX this.clientX}.
-       * @readonly
-       */
-      get x() {
-        return this.clientX;
-      }
-      /**
-       * Alias for {@link FederatedMouseEvent.clientY this.clientY}.
-       * @readonly
-       */
-      get y() {
-        return this.clientY;
-      }
-      /** @readonly */
-      get movementX() {
-        return this.movement.x;
-      }
-      /** @readonly */
-      get movementY() {
-        return this.movement.y;
-      }
-      /** @readonly */
-      get offsetX() {
-        return this.offset.x;
-      }
-      /** @readonly */
-      get offsetY() {
-        return this.offset.y;
-      }
-      /** @readonly */
-      get globalX() {
-        return this.global.x;
-      }
-      /** @readonly */
-      get globalY() {
-        return this.global.y;
-      }
-      /**
-       * The pointer coordinates in the renderer's screen. Alias for {@code screen.x}.
-       * @readonly
-       */
-      get screenX() {
-        return this.screen.x;
-      }
-      /**
-       * The pointer coordinates in the renderer's screen. Alias for {@code screen.y}.
-       * @readonly
-       */
-      get screenY() {
-        return this.screen.y;
-      }
-      /**
-       * This will return the local coordinates of the specified container for this InteractionData
-       * @param {Container} container - The Container that you would like the local
-       *  coords off
-       * @param {PointData} point - A Point object in which to store the value, optional (otherwise
-       *  will create a new point)
-       * @param {PointData} globalPos - A Point object containing your custom global coords, optional
-       *  (otherwise will use the current global coords)
-       * @returns - A point containing the coordinates of the InteractionData position relative
-       *  to the Container
-       */
-      getLocalPosition(container, point, globalPos) {
-        return container.worldTransform.applyInverse(globalPos || this.global, point);
-      }
-      /**
-       * Whether the modifier key was pressed when this event natively occurred.
-       * @param key - The modifier key.
-       */
-      getModifierState(key) {
-        return "getModifierState" in this.nativeEvent && this.nativeEvent.getModifierState(key);
-      }
-      /**
-       * Not supported.
-       * @param _typeArg
-       * @param _canBubbleArg
-       * @param _cancelableArg
-       * @param _viewArg
-       * @param _detailArg
-       * @param _screenXArg
-       * @param _screenYArg
-       * @param _clientXArg
-       * @param _clientYArg
-       * @param _ctrlKeyArg
-       * @param _altKeyArg
-       * @param _shiftKeyArg
-       * @param _metaKeyArg
-       * @param _buttonArg
-       * @param _relatedTargetArg
-       * @deprecated since 7.0.0
-       */
-      // eslint-disable-next-line max-params
-      initMouseEvent(_typeArg, _canBubbleArg, _cancelableArg, _viewArg, _detailArg, _screenXArg, _screenYArg, _clientXArg, _clientYArg, _ctrlKeyArg, _altKeyArg, _shiftKeyArg, _metaKeyArg, _buttonArg, _relatedTargetArg) {
-        throw new Error("Method not implemented.");
-      }
-    }
-
-    "use strict";
-    class FederatedPointerEvent extends FederatedMouseEvent {
-      constructor() {
-        super(...arguments);
-        /**
-         * The width of the pointer's contact along the x-axis, measured in CSS pixels.
-         * radiusX of TouchEvents will be represented by this value.
-         * @see https://developer.mozilla.org/en-US/docs/Web/API/PointerEvent/width
-         */
-        this.width = 0;
-        /**
-         * The height of the pointer's contact along the y-axis, measured in CSS pixels.
-         * radiusY of TouchEvents will be represented by this value.
-         * @see https://developer.mozilla.org/en-US/docs/Web/API/PointerEvent/height
-         */
-        this.height = 0;
-        /**
-         * Indicates whether or not the pointer device that created the event is the primary pointer.
-         * @see https://developer.mozilla.org/en-US/docs/Web/API/PointerEvent/isPrimary
-         */
-        this.isPrimary = false;
-      }
-      // Only included for completeness for now
-      getCoalescedEvents() {
-        if (this.type === "pointermove" || this.type === "mousemove" || this.type === "touchmove") {
-          return [this];
-        }
-        return [];
-      }
-      // Only included for completeness for now
-      getPredictedEvents() {
-        throw new Error("getPredictedEvents is not supported!");
-      }
-    }
-
-    "use strict";
-    class FederatedWheelEvent extends FederatedMouseEvent {
-      constructor() {
-        super(...arguments);
-        /** Units specified in pixels. */
-        this.DOM_DELTA_PIXEL = 0;
-        /** Units specified in lines. */
-        this.DOM_DELTA_LINE = 1;
-        /** Units specified in pages. */
-        this.DOM_DELTA_PAGE = 2;
-      }
-    }
-    /** Units specified in pixels. */
-    FederatedWheelEvent.DOM_DELTA_PIXEL = 0;
-    /** Units specified in lines. */
-    FederatedWheelEvent.DOM_DELTA_LINE = 1;
-    /** Units specified in pages. */
-    FederatedWheelEvent.DOM_DELTA_PAGE = 2;
-
-    "use strict";
-    const PROPAGATION_LIMIT = 2048;
-    const tempHitLocation = new Point();
-    const tempLocalMapping = new Point();
-    class EventBoundary {
-      /**
-       * @param rootTarget - The holder of the event boundary.
-       */
-      constructor(rootTarget) {
-        /**
-         * Emits events after they were dispatched into the scene graph.
-         *
-         * This can be used for global events listening, regardless of the scene graph being used. It should
-         * not be used by interactive libraries for normal use.
-         *
-         * Special events that do not bubble all the way to the root target are not emitted from here,
-         * e.g. pointerenter, pointerleave, click.
-         */
-        this.dispatch = new EventEmitter();
-        /**
-         * This flag would emit `pointermove`, `touchmove`, and `mousemove` events on all Containers.
-         *
-         * The `moveOnAll` semantics mirror those of earlier versions of PixiJS. This was disabled in favor of
-         * the Pointer Event API's approach.
-         */
-        this.moveOnAll = false;
-        /** Enables the global move events. `globalpointermove`, `globaltouchmove`, and `globalmousemove` */
-        this.enableGlobalMoveEvents = true;
-        /**
-         * State object for mapping methods.
-         * @see EventBoundary#trackingData
-         */
-        this.mappingState = {
-          trackingData: {}
-        };
-        /**
-         * The event pool maps event constructors to an free pool of instances of those specific events.
-         * @see EventBoundary#allocateEvent
-         * @see EventBoundary#freeEvent
-         */
-        this.eventPool = /* @__PURE__ */ new Map();
-        /** Every interactive element gathered from the scene. Only used in `pointermove` */
-        this._allInteractiveElements = [];
-        /** Every element that passed the hit test. Only used in `pointermove` */
-        this._hitElements = [];
-        /** Whether or not to collect all the interactive elements from the scene. Enabled in `pointermove` */
-        this._isPointerMoveEvent = false;
-        this.rootTarget = rootTarget;
-        this.hitPruneFn = this.hitPruneFn.bind(this);
-        this.hitTestFn = this.hitTestFn.bind(this);
-        this.mapPointerDown = this.mapPointerDown.bind(this);
-        this.mapPointerMove = this.mapPointerMove.bind(this);
-        this.mapPointerOut = this.mapPointerOut.bind(this);
-        this.mapPointerOver = this.mapPointerOver.bind(this);
-        this.mapPointerUp = this.mapPointerUp.bind(this);
-        this.mapPointerUpOutside = this.mapPointerUpOutside.bind(this);
-        this.mapWheel = this.mapWheel.bind(this);
-        this.mappingTable = {};
-        this.addEventMapping("pointerdown", this.mapPointerDown);
-        this.addEventMapping("pointermove", this.mapPointerMove);
-        this.addEventMapping("pointerout", this.mapPointerOut);
-        this.addEventMapping("pointerleave", this.mapPointerOut);
-        this.addEventMapping("pointerover", this.mapPointerOver);
-        this.addEventMapping("pointerup", this.mapPointerUp);
-        this.addEventMapping("pointerupoutside", this.mapPointerUpOutside);
-        this.addEventMapping("wheel", this.mapWheel);
-      }
-      /**
-       * Adds an event mapping for the event `type` handled by `fn`.
-       *
-       * Event mappings can be used to implement additional or custom events. They take an event
-       * coming from the upstream scene (or directly from the {@link EventSystem}) and dispatch new downstream events
-       * generally trickling down and bubbling up to {@link EventBoundary.rootTarget this.rootTarget}.
-       *
-       * To modify the semantics of existing events, the built-in mapping methods of EventBoundary should be overridden
-       * instead.
-       * @param type - The type of upstream event to map.
-       * @param fn - The mapping method. The context of this function must be bound manually, if desired.
-       */
-      addEventMapping(type, fn) {
-        if (!this.mappingTable[type]) {
-          this.mappingTable[type] = [];
-        }
-        this.mappingTable[type].push({
-          fn,
-          priority: 0
-        });
-        this.mappingTable[type].sort((a, b) => a.priority - b.priority);
-      }
-      /**
-       * Dispatches the given event
-       * @param e - The event to dispatch.
-       * @param type - The type of event to dispatch. Defaults to `e.type`.
-       */
-      dispatchEvent(e, type) {
-        e.propagationStopped = false;
-        e.propagationImmediatelyStopped = false;
-        this.propagate(e, type);
-        this.dispatch.emit(type || e.type, e);
-      }
-      /**
-       * Maps the given upstream event through the event boundary and propagates it downstream.
-       * @param e - The event to map.
-       */
-      mapEvent(e) {
-        if (!this.rootTarget) {
-          return;
-        }
-        const mappers = this.mappingTable[e.type];
-        if (mappers) {
-          for (let i = 0, j = mappers.length; i < j; i++) {
-            mappers[i].fn(e);
-          }
-        } else {
-          warn(`[EventBoundary]: Event mapping not defined for ${e.type}`);
-        }
-      }
-      /**
-       * Finds the Container that is the target of a event at the given coordinates.
-       *
-       * The passed (x,y) coordinates are in the world space above this event boundary.
-       * @param x - The x coordinate of the event.
-       * @param y - The y coordinate of the event.
-       */
-      hitTest(x, y) {
-        EventsTicker.pauseUpdate = true;
-        const useMove = this._isPointerMoveEvent && this.enableGlobalMoveEvents;
-        const fn = useMove ? "hitTestMoveRecursive" : "hitTestRecursive";
-        const invertedPath = this[fn](
-          this.rootTarget,
-          this.rootTarget.eventMode,
-          tempHitLocation.set(x, y),
-          this.hitTestFn,
-          this.hitPruneFn
-        );
-        return invertedPath && invertedPath[0];
-      }
-      /**
-       * Propagate the passed event from from {@link EventBoundary.rootTarget this.rootTarget} to its
-       * target {@code e.target}.
-       * @param e - The event to propagate.
-       * @param type - The type of event to propagate. Defaults to `e.type`.
-       */
-      propagate(e, type) {
-        if (!e.target) {
-          return;
-        }
-        const composedPath = e.composedPath();
-        e.eventPhase = e.CAPTURING_PHASE;
-        for (let i = 0, j = composedPath.length - 1; i < j; i++) {
-          e.currentTarget = composedPath[i];
-          this.notifyTarget(e, type);
-          if (e.propagationStopped || e.propagationImmediatelyStopped)
-            return;
-        }
-        e.eventPhase = e.AT_TARGET;
-        e.currentTarget = e.target;
-        this.notifyTarget(e, type);
-        if (e.propagationStopped || e.propagationImmediatelyStopped)
-          return;
-        e.eventPhase = e.BUBBLING_PHASE;
-        for (let i = composedPath.length - 2; i >= 0; i--) {
-          e.currentTarget = composedPath[i];
-          this.notifyTarget(e, type);
-          if (e.propagationStopped || e.propagationImmediatelyStopped)
-            return;
-        }
-      }
-      /**
-       * Emits the event {@code e} to all interactive containers. The event is propagated in the bubbling phase always.
-       *
-       * This is used in the `globalpointermove` event.
-       * @param e - The emitted event.
-       * @param type - The listeners to notify.
-       * @param targets - The targets to notify.
-       */
-      all(e, type, targets = this._allInteractiveElements) {
-        if (targets.length === 0)
-          return;
-        e.eventPhase = e.BUBBLING_PHASE;
-        const events = Array.isArray(type) ? type : [type];
-        for (let i = targets.length - 1; i >= 0; i--) {
-          events.forEach((event) => {
-            e.currentTarget = targets[i];
-            this.notifyTarget(e, event);
-          });
-        }
-      }
-      /**
-       * Finds the propagation path from {@link EventBoundary.rootTarget rootTarget} to the passed
-       * {@code target}. The last element in the path is {@code target}.
-       * @param target - The target to find the propagation path to.
-       */
-      propagationPath(target) {
-        const propagationPath = [target];
-        for (let i = 0; i < PROPAGATION_LIMIT && (target !== this.rootTarget && target.parent); i++) {
-          if (!target.parent) {
-            throw new Error("Cannot find propagation path to disconnected target");
-          }
-          propagationPath.push(target.parent);
-          target = target.parent;
-        }
-        propagationPath.reverse();
-        return propagationPath;
-      }
-      hitTestMoveRecursive(currentTarget, eventMode, location, testFn, pruneFn, ignore = false) {
-        let shouldReturn = false;
-        if (this._interactivePrune(currentTarget))
-          return null;
-        if (currentTarget.eventMode === "dynamic" || eventMode === "dynamic") {
-          EventsTicker.pauseUpdate = false;
-        }
-        if (currentTarget.interactiveChildren && currentTarget.children) {
-          const children = currentTarget.children;
-          for (let i = children.length - 1; i >= 0; i--) {
-            const child = children[i];
-            const nestedHit = this.hitTestMoveRecursive(
-              child,
-              this._isInteractive(eventMode) ? eventMode : child.eventMode,
-              location,
-              testFn,
-              pruneFn,
-              ignore || pruneFn(currentTarget, location)
-            );
-            if (nestedHit) {
-              if (nestedHit.length > 0 && !nestedHit[nestedHit.length - 1].parent) {
-                continue;
-              }
-              const isInteractive = currentTarget.isInteractive();
-              if (nestedHit.length > 0 || isInteractive) {
-                if (isInteractive)
-                  this._allInteractiveElements.push(currentTarget);
-                nestedHit.push(currentTarget);
-              }
-              if (this._hitElements.length === 0)
-                this._hitElements = nestedHit;
-              shouldReturn = true;
-            }
-          }
-        }
-        const isInteractiveMode = this._isInteractive(eventMode);
-        const isInteractiveTarget = currentTarget.isInteractive();
-        if (isInteractiveTarget && isInteractiveTarget)
-          this._allInteractiveElements.push(currentTarget);
-        if (ignore || this._hitElements.length > 0)
-          return null;
-        if (shouldReturn)
-          return this._hitElements;
-        if (isInteractiveMode && (!pruneFn(currentTarget, location) && testFn(currentTarget, location))) {
-          return isInteractiveTarget ? [currentTarget] : [];
-        }
-        return null;
-      }
-      /**
-       * Recursive implementation for {@link EventBoundary.hitTest hitTest}.
-       * @param currentTarget - The Container that is to be hit tested.
-       * @param eventMode - The event mode for the `currentTarget` or one of its parents.
-       * @param location - The location that is being tested for overlap.
-       * @param testFn - Callback that determines whether the target passes hit testing. This callback
-       *  can assume that `pruneFn` failed to prune the container.
-       * @param pruneFn - Callback that determiness whether the target and all of its children
-       *  cannot pass the hit test. It is used as a preliminary optimization to prune entire subtrees
-       *  of the scene graph.
-       * @returns An array holding the hit testing target and all its ancestors in order. The first element
-       *  is the target itself and the last is {@link EventBoundary.rootTarget rootTarget}. This is the opposite
-       *  order w.r.t. the propagation path. If no hit testing target is found, null is returned.
-       */
-      hitTestRecursive(currentTarget, eventMode, location, testFn, pruneFn) {
-        if (this._interactivePrune(currentTarget) || pruneFn(currentTarget, location)) {
-          return null;
-        }
-        if (currentTarget.eventMode === "dynamic" || eventMode === "dynamic") {
-          EventsTicker.pauseUpdate = false;
-        }
-        if (currentTarget.interactiveChildren && currentTarget.children) {
-          const children = currentTarget.children;
-          const relativeLocation = location;
-          for (let i = children.length - 1; i >= 0; i--) {
-            const child = children[i];
-            const nestedHit = this.hitTestRecursive(
-              child,
-              this._isInteractive(eventMode) ? eventMode : child.eventMode,
-              relativeLocation,
-              testFn,
-              pruneFn
-            );
-            if (nestedHit) {
-              if (nestedHit.length > 0 && !nestedHit[nestedHit.length - 1].parent) {
-                continue;
-              }
-              const isInteractive = currentTarget.isInteractive();
-              if (nestedHit.length > 0 || isInteractive)
-                nestedHit.push(currentTarget);
-              return nestedHit;
-            }
-          }
-        }
-        const isInteractiveMode = this._isInteractive(eventMode);
-        const isInteractiveTarget = currentTarget.isInteractive();
-        if (isInteractiveMode && testFn(currentTarget, location)) {
-          return isInteractiveTarget ? [currentTarget] : [];
-        }
-        return null;
-      }
-      _isInteractive(int) {
-        return int === "static" || int === "dynamic";
-      }
-      _interactivePrune(container) {
-        if (!container || !container.visible || !container.renderable) {
-          return true;
-        }
-        if (container.eventMode === "none") {
-          return true;
-        }
-        if (container.eventMode === "passive" && !container.interactiveChildren) {
-          return true;
-        }
-        return false;
-      }
-      /**
-       * Checks whether the container or any of its children cannot pass the hit test at all.
-       *
-       * {@link EventBoundary}'s implementation uses the {@link Container.hitArea hitArea}
-       * and {@link Container._mask} for pruning.
-       * @param container - The container to prune.
-       * @param location - The location to test for overlap.
-       */
-      hitPruneFn(container, location) {
-        if (container.hitArea) {
-          container.worldTransform.applyInverse(location, tempLocalMapping);
-          if (!container.hitArea.contains(tempLocalMapping.x, tempLocalMapping.y)) {
-            return true;
-          }
-        }
-        if (container.effects && container.effects.length) {
-          for (let i = 0; i < container.effects.length; i++) {
-            const effect = container.effects[i];
-            if (effect.containsPoint) {
-              const effectContainsPoint = effect.containsPoint(location, this.hitTestFn);
-              if (!effectContainsPoint) {
-                return true;
-              }
-            }
-          }
-        }
-        return false;
-      }
-      /**
-       * Checks whether the container passes hit testing for the given location.
-       * @param container - The container to test.
-       * @param location - The location to test for overlap.
-       * @returns - Whether `container` passes hit testing for `location`.
-       */
-      hitTestFn(container, location) {
-        if (container.hitArea) {
-          return true;
-        }
-        if (container == null ? void 0 : container.containsPoint) {
-          container.worldTransform.applyInverse(location, tempLocalMapping);
-          return container.containsPoint(tempLocalMapping);
-        }
-        return false;
-      }
-      /**
-       * Notify all the listeners to the event's `currentTarget`.
-       *
-       * If the `currentTarget` contains the property `on<type>`, then it is called here,
-       * simulating the behavior from version 6.x and prior.
-       * @param e - The event passed to the target.
-       * @param type - The type of event to notify. Defaults to `e.type`.
-       */
-      notifyTarget(e, type) {
-        var _a, _b;
-        type = type != null ? type : e.type;
-        const handlerKey = `on${type}`;
-        (_b = (_a = e.currentTarget)[handlerKey]) == null ? void 0 : _b.call(_a, e);
-        const key = e.eventPhase === e.CAPTURING_PHASE || e.eventPhase === e.AT_TARGET ? `${type}capture` : type;
-        this._notifyListeners(e, key);
-        if (e.eventPhase === e.AT_TARGET) {
-          this._notifyListeners(e, type);
-        }
-      }
-      /**
-       * Maps the upstream `pointerdown` events to a downstream `pointerdown` event.
-       *
-       * `touchstart`, `rightdown`, `mousedown` events are also dispatched for specific pointer types.
-       * @param from - The upstream `pointerdown` event.
-       */
-      mapPointerDown(from) {
-        if (!(from instanceof FederatedPointerEvent)) {
-          warn("EventBoundary cannot map a non-pointer event as a pointer event");
-          return;
-        }
-        const e = this.createPointerEvent(from);
-        this.dispatchEvent(e, "pointerdown");
-        if (e.pointerType === "touch") {
-          this.dispatchEvent(e, "touchstart");
-        } else if (e.pointerType === "mouse" || e.pointerType === "pen") {
-          const isRightButton = e.button === 2;
-          this.dispatchEvent(e, isRightButton ? "rightdown" : "mousedown");
-        }
-        const trackingData = this.trackingData(from.pointerId);
-        trackingData.pressTargetsByButton[from.button] = e.composedPath();
-        this.freeEvent(e);
-      }
-      /**
-       * Maps the upstream `pointermove` to downstream `pointerout`, `pointerover`, and `pointermove` events, in that order.
-       *
-       * The tracking data for the specific pointer has an updated `overTarget`. `mouseout`, `mouseover`,
-       * `mousemove`, and `touchmove` events are fired as well for specific pointer types.
-       * @param from - The upstream `pointermove` event.
-       */
-      mapPointerMove(from) {
-        var _a, _b, _c;
-        if (!(from instanceof FederatedPointerEvent)) {
-          warn("EventBoundary cannot map a non-pointer event as a pointer event");
-          return;
-        }
-        this._allInteractiveElements.length = 0;
-        this._hitElements.length = 0;
-        this._isPointerMoveEvent = true;
-        const e = this.createPointerEvent(from);
-        this._isPointerMoveEvent = false;
-        const isMouse = e.pointerType === "mouse" || e.pointerType === "pen";
-        const trackingData = this.trackingData(from.pointerId);
-        const outTarget = this.findMountedTarget(trackingData.overTargets);
-        if (((_a = trackingData.overTargets) == null ? void 0 : _a.length) > 0 && outTarget !== e.target) {
-          const outType = from.type === "mousemove" ? "mouseout" : "pointerout";
-          const outEvent = this.createPointerEvent(from, outType, outTarget);
-          this.dispatchEvent(outEvent, "pointerout");
-          if (isMouse)
-            this.dispatchEvent(outEvent, "mouseout");
-          if (!e.composedPath().includes(outTarget)) {
-            const leaveEvent = this.createPointerEvent(from, "pointerleave", outTarget);
-            leaveEvent.eventPhase = leaveEvent.AT_TARGET;
-            while (leaveEvent.target && !e.composedPath().includes(leaveEvent.target)) {
-              leaveEvent.currentTarget = leaveEvent.target;
-              this.notifyTarget(leaveEvent);
-              if (isMouse)
-                this.notifyTarget(leaveEvent, "mouseleave");
-              leaveEvent.target = leaveEvent.target.parent;
-            }
-            this.freeEvent(leaveEvent);
-          }
-          this.freeEvent(outEvent);
-        }
-        if (outTarget !== e.target) {
-          const overType = from.type === "mousemove" ? "mouseover" : "pointerover";
-          const overEvent = this.clonePointerEvent(e, overType);
-          this.dispatchEvent(overEvent, "pointerover");
-          if (isMouse)
-            this.dispatchEvent(overEvent, "mouseover");
-          let overTargetAncestor = outTarget == null ? void 0 : outTarget.parent;
-          while (overTargetAncestor && overTargetAncestor !== this.rootTarget.parent) {
-            if (overTargetAncestor === e.target)
-              break;
-            overTargetAncestor = overTargetAncestor.parent;
-          }
-          const didPointerEnter = !overTargetAncestor || overTargetAncestor === this.rootTarget.parent;
-          if (didPointerEnter) {
-            const enterEvent = this.clonePointerEvent(e, "pointerenter");
-            enterEvent.eventPhase = enterEvent.AT_TARGET;
-            while (enterEvent.target && enterEvent.target !== outTarget && enterEvent.target !== this.rootTarget.parent) {
-              enterEvent.currentTarget = enterEvent.target;
-              this.notifyTarget(enterEvent);
-              if (isMouse)
-                this.notifyTarget(enterEvent, "mouseenter");
-              enterEvent.target = enterEvent.target.parent;
-            }
-            this.freeEvent(enterEvent);
-          }
-          this.freeEvent(overEvent);
-        }
-        const allMethods = [];
-        const allowGlobalPointerEvents = (_b = this.enableGlobalMoveEvents) != null ? _b : true;
-        this.moveOnAll ? allMethods.push("pointermove") : this.dispatchEvent(e, "pointermove");
-        allowGlobalPointerEvents && allMethods.push("globalpointermove");
-        if (e.pointerType === "touch") {
-          this.moveOnAll ? allMethods.splice(1, 0, "touchmove") : this.dispatchEvent(e, "touchmove");
-          allowGlobalPointerEvents && allMethods.push("globaltouchmove");
-        }
-        if (isMouse) {
-          this.moveOnAll ? allMethods.splice(1, 0, "mousemove") : this.dispatchEvent(e, "mousemove");
-          allowGlobalPointerEvents && allMethods.push("globalmousemove");
-          this.cursor = (_c = e.target) == null ? void 0 : _c.cursor;
-        }
-        if (allMethods.length > 0) {
-          this.all(e, allMethods);
-        }
-        this._allInteractiveElements.length = 0;
-        this._hitElements.length = 0;
-        trackingData.overTargets = e.composedPath();
-        this.freeEvent(e);
-      }
-      /**
-       * Maps the upstream `pointerover` to downstream `pointerover` and `pointerenter` events, in that order.
-       *
-       * The tracking data for the specific pointer gets a new `overTarget`.
-       * @param from - The upstream `pointerover` event.
-       */
-      mapPointerOver(from) {
-        var _a;
-        if (!(from instanceof FederatedPointerEvent)) {
-          warn("EventBoundary cannot map a non-pointer event as a pointer event");
-          return;
-        }
-        const trackingData = this.trackingData(from.pointerId);
-        const e = this.createPointerEvent(from);
-        const isMouse = e.pointerType === "mouse" || e.pointerType === "pen";
-        this.dispatchEvent(e, "pointerover");
-        if (isMouse)
-          this.dispatchEvent(e, "mouseover");
-        if (e.pointerType === "mouse")
-          this.cursor = (_a = e.target) == null ? void 0 : _a.cursor;
-        const enterEvent = this.clonePointerEvent(e, "pointerenter");
-        enterEvent.eventPhase = enterEvent.AT_TARGET;
-        while (enterEvent.target && enterEvent.target !== this.rootTarget.parent) {
-          enterEvent.currentTarget = enterEvent.target;
-          this.notifyTarget(enterEvent);
-          if (isMouse)
-            this.notifyTarget(enterEvent, "mouseenter");
-          enterEvent.target = enterEvent.target.parent;
-        }
-        trackingData.overTargets = e.composedPath();
-        this.freeEvent(e);
-        this.freeEvent(enterEvent);
-      }
-      /**
-       * Maps the upstream `pointerout` to downstream `pointerout`, `pointerleave` events, in that order.
-       *
-       * The tracking data for the specific pointer is cleared of a `overTarget`.
-       * @param from - The upstream `pointerout` event.
-       */
-      mapPointerOut(from) {
-        if (!(from instanceof FederatedPointerEvent)) {
-          warn("EventBoundary cannot map a non-pointer event as a pointer event");
-          return;
-        }
-        const trackingData = this.trackingData(from.pointerId);
-        if (trackingData.overTargets) {
-          const isMouse = from.pointerType === "mouse" || from.pointerType === "pen";
-          const outTarget = this.findMountedTarget(trackingData.overTargets);
-          const outEvent = this.createPointerEvent(from, "pointerout", outTarget);
-          this.dispatchEvent(outEvent);
-          if (isMouse)
-            this.dispatchEvent(outEvent, "mouseout");
-          const leaveEvent = this.createPointerEvent(from, "pointerleave", outTarget);
-          leaveEvent.eventPhase = leaveEvent.AT_TARGET;
-          while (leaveEvent.target && leaveEvent.target !== this.rootTarget.parent) {
-            leaveEvent.currentTarget = leaveEvent.target;
-            this.notifyTarget(leaveEvent);
-            if (isMouse)
-              this.notifyTarget(leaveEvent, "mouseleave");
-            leaveEvent.target = leaveEvent.target.parent;
-          }
-          trackingData.overTargets = null;
-          this.freeEvent(outEvent);
-          this.freeEvent(leaveEvent);
-        }
-        this.cursor = null;
-      }
-      /**
-       * Maps the upstream `pointerup` event to downstream `pointerup`, `pointerupoutside`,
-       * and `click`/`rightclick`/`pointertap` events, in that order.
-       *
-       * The `pointerupoutside` event bubbles from the original `pointerdown` target to the most specific
-       * ancestor of the `pointerdown` and `pointerup` targets, which is also the `click` event's target. `touchend`,
-       * `rightup`, `mouseup`, `touchendoutside`, `rightupoutside`, `mouseupoutside`, and `tap` are fired as well for
-       * specific pointer types.
-       * @param from - The upstream `pointerup` event.
-       */
-      mapPointerUp(from) {
-        if (!(from instanceof FederatedPointerEvent)) {
-          warn("EventBoundary cannot map a non-pointer event as a pointer event");
-          return;
-        }
-        const now = performance.now();
-        const e = this.createPointerEvent(from);
-        this.dispatchEvent(e, "pointerup");
-        if (e.pointerType === "touch") {
-          this.dispatchEvent(e, "touchend");
-        } else if (e.pointerType === "mouse" || e.pointerType === "pen") {
-          const isRightButton = e.button === 2;
-          this.dispatchEvent(e, isRightButton ? "rightup" : "mouseup");
-        }
-        const trackingData = this.trackingData(from.pointerId);
-        const pressTarget = this.findMountedTarget(trackingData.pressTargetsByButton[from.button]);
-        let clickTarget = pressTarget;
-        if (pressTarget && !e.composedPath().includes(pressTarget)) {
-          let currentTarget = pressTarget;
-          while (currentTarget && !e.composedPath().includes(currentTarget)) {
-            e.currentTarget = currentTarget;
-            this.notifyTarget(e, "pointerupoutside");
-            if (e.pointerType === "touch") {
-              this.notifyTarget(e, "touchendoutside");
-            } else if (e.pointerType === "mouse" || e.pointerType === "pen") {
-              const isRightButton = e.button === 2;
-              this.notifyTarget(e, isRightButton ? "rightupoutside" : "mouseupoutside");
-            }
-            currentTarget = currentTarget.parent;
-          }
-          delete trackingData.pressTargetsByButton[from.button];
-          clickTarget = currentTarget;
-        }
-        if (clickTarget) {
-          const clickEvent = this.clonePointerEvent(e, "click");
-          clickEvent.target = clickTarget;
-          clickEvent.path = null;
-          if (!trackingData.clicksByButton[from.button]) {
-            trackingData.clicksByButton[from.button] = {
-              clickCount: 0,
-              target: clickEvent.target,
-              timeStamp: now
-            };
-          }
-          const clickHistory = trackingData.clicksByButton[from.button];
-          if (clickHistory.target === clickEvent.target && now - clickHistory.timeStamp < 200) {
-            ++clickHistory.clickCount;
-          } else {
-            clickHistory.clickCount = 1;
-          }
-          clickHistory.target = clickEvent.target;
-          clickHistory.timeStamp = now;
-          clickEvent.detail = clickHistory.clickCount;
-          if (clickEvent.pointerType === "mouse") {
-            const isRightButton = clickEvent.button === 2;
-            this.dispatchEvent(clickEvent, isRightButton ? "rightclick" : "click");
-          } else if (clickEvent.pointerType === "touch") {
-            this.dispatchEvent(clickEvent, "tap");
-          }
-          this.dispatchEvent(clickEvent, "pointertap");
-          this.freeEvent(clickEvent);
-        }
-        this.freeEvent(e);
-      }
-      /**
-       * Maps the upstream `pointerupoutside` event to a downstream `pointerupoutside` event, bubbling from the original
-       * `pointerdown` target to `rootTarget`.
-       *
-       * (The most specific ancestor of the `pointerdown` event and the `pointerup` event must the
-       * `{@link EventBoundary}'s root because the `pointerup` event occurred outside of the boundary.)
-       *
-       * `touchendoutside`, `mouseupoutside`, and `rightupoutside` events are fired as well for specific pointer
-       * types. The tracking data for the specific pointer is cleared of a `pressTarget`.
-       * @param from - The upstream `pointerupoutside` event.
-       */
-      mapPointerUpOutside(from) {
-        if (!(from instanceof FederatedPointerEvent)) {
-          warn("EventBoundary cannot map a non-pointer event as a pointer event");
-          return;
-        }
-        const trackingData = this.trackingData(from.pointerId);
-        const pressTarget = this.findMountedTarget(trackingData.pressTargetsByButton[from.button]);
-        const e = this.createPointerEvent(from);
-        if (pressTarget) {
-          let currentTarget = pressTarget;
-          while (currentTarget) {
-            e.currentTarget = currentTarget;
-            this.notifyTarget(e, "pointerupoutside");
-            if (e.pointerType === "touch") {
-              this.notifyTarget(e, "touchendoutside");
-            } else if (e.pointerType === "mouse" || e.pointerType === "pen") {
-              this.notifyTarget(e, e.button === 2 ? "rightupoutside" : "mouseupoutside");
-            }
-            currentTarget = currentTarget.parent;
-          }
-          delete trackingData.pressTargetsByButton[from.button];
-        }
-        this.freeEvent(e);
-      }
-      /**
-       * Maps the upstream `wheel` event to a downstream `wheel` event.
-       * @param from - The upstream `wheel` event.
-       */
-      mapWheel(from) {
-        if (!(from instanceof FederatedWheelEvent)) {
-          warn("EventBoundary cannot map a non-wheel event as a wheel event");
-          return;
-        }
-        const wheelEvent = this.createWheelEvent(from);
-        this.dispatchEvent(wheelEvent);
-        this.freeEvent(wheelEvent);
-      }
-      /**
-       * Finds the most specific event-target in the given propagation path that is still mounted in the scene graph.
-       *
-       * This is used to find the correct `pointerup` and `pointerout` target in the case that the original `pointerdown`
-       * or `pointerover` target was unmounted from the scene graph.
-       * @param propagationPath - The propagation path was valid in the past.
-       * @returns - The most specific event-target still mounted at the same location in the scene graph.
-       */
-      findMountedTarget(propagationPath) {
-        if (!propagationPath) {
-          return null;
-        }
-        let currentTarget = propagationPath[0];
-        for (let i = 1; i < propagationPath.length; i++) {
-          if (propagationPath[i].parent === currentTarget) {
-            currentTarget = propagationPath[i];
-          } else {
-            break;
-          }
-        }
-        return currentTarget;
-      }
-      /**
-       * Creates an event whose {@code originalEvent} is {@code from}, with an optional `type` and `target` override.
-       *
-       * The event is allocated using {@link EventBoundary#allocateEvent this.allocateEvent}.
-       * @param from - The {@code originalEvent} for the returned event.
-       * @param [type=from.type] - The type of the returned event.
-       * @param target - The target of the returned event.
-       */
-      createPointerEvent(from, type, target) {
-        var _a;
-        const event = this.allocateEvent(FederatedPointerEvent);
-        this.copyPointerData(from, event);
-        this.copyMouseData(from, event);
-        this.copyData(from, event);
-        event.nativeEvent = from.nativeEvent;
-        event.originalEvent = from;
-        event.target = (_a = target != null ? target : this.hitTest(event.global.x, event.global.y)) != null ? _a : this._hitElements[0];
-        if (typeof type === "string") {
-          event.type = type;
-        }
-        return event;
-      }
-      /**
-       * Creates a wheel event whose {@code originalEvent} is {@code from}.
-       *
-       * The event is allocated using {@link EventBoundary#allocateEvent this.allocateEvent}.
-       * @param from - The upstream wheel event.
-       */
-      createWheelEvent(from) {
-        const event = this.allocateEvent(FederatedWheelEvent);
-        this.copyWheelData(from, event);
-        this.copyMouseData(from, event);
-        this.copyData(from, event);
-        event.nativeEvent = from.nativeEvent;
-        event.originalEvent = from;
-        event.target = this.hitTest(event.global.x, event.global.y);
-        return event;
-      }
-      /**
-       * Clones the event {@code from}, with an optional {@code type} override.
-       *
-       * The event is allocated using {@link EventBoundary#allocateEvent this.allocateEvent}.
-       * @param from - The event to clone.
-       * @param [type=from.type] - The type of the returned event.
-       */
-      clonePointerEvent(from, type) {
-        const event = this.allocateEvent(FederatedPointerEvent);
-        event.nativeEvent = from.nativeEvent;
-        event.originalEvent = from.originalEvent;
-        this.copyPointerData(from, event);
-        this.copyMouseData(from, event);
-        this.copyData(from, event);
-        event.target = from.target;
-        event.path = from.composedPath().slice();
-        event.type = type != null ? type : event.type;
-        return event;
-      }
-      /**
-       * Copies wheel {@link FederatedWheelEvent} data from {@code from} into {@code to}.
-       *
-       * The following properties are copied:
-       * + deltaMode
-       * + deltaX
-       * + deltaY
-       * + deltaZ
-       * @param from - The event to copy data from.
-       * @param to - The event to copy data into.
-       */
-      copyWheelData(from, to) {
-        to.deltaMode = from.deltaMode;
-        to.deltaX = from.deltaX;
-        to.deltaY = from.deltaY;
-        to.deltaZ = from.deltaZ;
-      }
-      /**
-       * Copies pointer {@link FederatedPointerEvent} data from {@code from} into {@code to}.
-       *
-       * The following properties are copied:
-       * + pointerId
-       * + width
-       * + height
-       * + isPrimary
-       * + pointerType
-       * + pressure
-       * + tangentialPressure
-       * + tiltX
-       * + tiltY
-       * @param from - The event to copy data from.
-       * @param to - The event to copy data into.
-       */
-      copyPointerData(from, to) {
-        if (!(from instanceof FederatedPointerEvent && to instanceof FederatedPointerEvent))
-          return;
-        to.pointerId = from.pointerId;
-        to.width = from.width;
-        to.height = from.height;
-        to.isPrimary = from.isPrimary;
-        to.pointerType = from.pointerType;
-        to.pressure = from.pressure;
-        to.tangentialPressure = from.tangentialPressure;
-        to.tiltX = from.tiltX;
-        to.tiltY = from.tiltY;
-        to.twist = from.twist;
-      }
-      /**
-       * Copies mouse {@link FederatedMouseEvent} data from {@code from} to {@code to}.
-       *
-       * The following properties are copied:
-       * + altKey
-       * + button
-       * + buttons
-       * + clientX
-       * + clientY
-       * + metaKey
-       * + movementX
-       * + movementY
-       * + pageX
-       * + pageY
-       * + x
-       * + y
-       * + screen
-       * + shiftKey
-       * + global
-       * @param from - The event to copy data from.
-       * @param to - The event to copy data into.
-       */
-      copyMouseData(from, to) {
-        if (!(from instanceof FederatedMouseEvent && to instanceof FederatedMouseEvent))
-          return;
-        to.altKey = from.altKey;
-        to.button = from.button;
-        to.buttons = from.buttons;
-        to.client.copyFrom(from.client);
-        to.ctrlKey = from.ctrlKey;
-        to.metaKey = from.metaKey;
-        to.movement.copyFrom(from.movement);
-        to.screen.copyFrom(from.screen);
-        to.shiftKey = from.shiftKey;
-        to.global.copyFrom(from.global);
-      }
-      /**
-       * Copies base {@link FederatedEvent} data from {@code from} into {@code to}.
-       *
-       * The following properties are copied:
-       * + isTrusted
-       * + srcElement
-       * + timeStamp
-       * + type
-       * @param from - The event to copy data from.
-       * @param to - The event to copy data into.
-       */
-      copyData(from, to) {
-        to.isTrusted = from.isTrusted;
-        to.srcElement = from.srcElement;
-        to.timeStamp = performance.now();
-        to.type = from.type;
-        to.detail = from.detail;
-        to.view = from.view;
-        to.which = from.which;
-        to.layer.copyFrom(from.layer);
-        to.page.copyFrom(from.page);
-      }
-      /**
-       * @param id - The pointer ID.
-       * @returns The tracking data stored for the given pointer. If no data exists, a blank
-       *  state will be created.
-       */
-      trackingData(id) {
-        if (!this.mappingState.trackingData[id]) {
-          this.mappingState.trackingData[id] = {
-            pressTargetsByButton: {},
-            clicksByButton: {},
-            overTarget: null
-          };
-        }
-        return this.mappingState.trackingData[id];
-      }
-      /**
-       * Allocate a specific type of event from {@link EventBoundary#eventPool this.eventPool}.
-       *
-       * This allocation is constructor-agnostic, as long as it only takes one argument - this event
-       * boundary.
-       * @param constructor - The event's constructor.
-       */
-      allocateEvent(constructor) {
-        if (!this.eventPool.has(constructor)) {
-          this.eventPool.set(constructor, []);
-        }
-        const event = this.eventPool.get(constructor).pop() || new constructor(this);
-        event.eventPhase = event.NONE;
-        event.currentTarget = null;
-        event.path = null;
-        event.target = null;
-        return event;
-      }
-      /**
-       * Frees the event and puts it back into the event pool.
-       *
-       * It is illegal to reuse the event until it is allocated again, using `this.allocateEvent`.
-       *
-       * It is also advised that events not allocated from {@link EventBoundary#allocateEvent this.allocateEvent}
-       * not be freed. This is because of the possibility that the same event is freed twice, which can cause
-       * it to be allocated twice & result in overwriting.
-       * @param event - The event to be freed.
-       * @throws Error if the event is managed by another event boundary.
-       */
-      freeEvent(event) {
-        if (event.manager !== this)
-          throw new Error("It is illegal to free an event not managed by this EventBoundary!");
-        const constructor = event.constructor;
-        if (!this.eventPool.has(constructor)) {
-          this.eventPool.set(constructor, []);
-        }
-        this.eventPool.get(constructor).push(event);
-      }
-      /**
-       * Similar to {@link EventEmitter.emit}, except it stops if the `propagationImmediatelyStopped` flag
-       * is set on the event.
-       * @param e - The event to call each listener with.
-       * @param type - The event key.
-       */
-      _notifyListeners(e, type) {
-        const listeners = e.currentTarget._events[type];
-        if (!listeners)
-          return;
-        if (!e.currentTarget.isInteractive())
-          return;
-        if ("fn" in listeners) {
-          if (listeners.once)
-            e.currentTarget.removeListener(type, listeners.fn, void 0, true);
-          listeners.fn.call(listeners.context, e);
-        } else {
-          for (let i = 0, j = listeners.length; i < j && !e.propagationImmediatelyStopped; i++) {
-            if (listeners[i].once)
-              e.currentTarget.removeListener(type, listeners[i].fn, void 0, true);
-            listeners[i].fn.call(listeners[i].context, e);
-          }
-        }
-      }
-    }
-
-    "use strict";
-    var __defProp$U = Object.defineProperty;
-    var __getOwnPropSymbols$U = Object.getOwnPropertySymbols;
-    var __hasOwnProp$U = Object.prototype.hasOwnProperty;
-    var __propIsEnum$U = Object.prototype.propertyIsEnumerable;
-    var __defNormalProp$U = (obj, key, value) => key in obj ? __defProp$U(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-    var __spreadValues$U = (a, b) => {
-      for (var prop in b || (b = {}))
-        if (__hasOwnProp$U.call(b, prop))
-          __defNormalProp$U(a, prop, b[prop]);
-      if (__getOwnPropSymbols$U)
-        for (var prop of __getOwnPropSymbols$U(b)) {
-          if (__propIsEnum$U.call(b, prop))
-            __defNormalProp$U(a, prop, b[prop]);
-        }
-      return a;
-    };
-    const MOUSE_POINTER_ID = 1;
-    const TOUCH_TO_POINTER = {
-      touchstart: "pointerdown",
-      touchend: "pointerup",
-      touchendoutside: "pointerupoutside",
-      touchmove: "pointermove",
-      touchcancel: "pointercancel"
-    };
-    const _EventSystem = class _EventSystem {
-      /**
-       * @param {Renderer} renderer
-       */
-      constructor(renderer) {
-        /** Does the device support touch events https://www.w3.org/TR/touch-events/ */
-        this.supportsTouchEvents = "ontouchstart" in globalThis;
-        /** Does the device support pointer events https://www.w3.org/Submission/pointer-events/ */
-        this.supportsPointerEvents = !!globalThis.PointerEvent;
-        /**
-         * The DOM element to which the root event listeners are bound. This is automatically set to
-         * the renderer's {@link Renderer#view view}.
-         */
-        this.domElement = null;
-        /** The resolution used to convert between the DOM client space into world space. */
-        this.resolution = 1;
-        this.renderer = renderer;
-        this.rootBoundary = new EventBoundary(null);
-        EventsTicker.init(this);
-        this.autoPreventDefault = true;
-        this._eventsAdded = false;
-        this._rootPointerEvent = new FederatedPointerEvent(null);
-        this._rootWheelEvent = new FederatedWheelEvent(null);
-        this.cursorStyles = {
-          default: "inherit",
-          pointer: "pointer"
-        };
-        this.features = new Proxy(__spreadValues$U({}, _EventSystem.defaultEventFeatures), {
-          set: (target, key, value) => {
-            if (key === "globalMove") {
-              this.rootBoundary.enableGlobalMoveEvents = value;
-            }
-            target[key] = value;
-            return true;
-          }
-        });
-        this._onPointerDown = this._onPointerDown.bind(this);
-        this._onPointerMove = this._onPointerMove.bind(this);
-        this._onPointerUp = this._onPointerUp.bind(this);
-        this._onPointerOverOut = this._onPointerOverOut.bind(this);
-        this.onWheel = this.onWheel.bind(this);
-      }
-      /**
-       * The default interaction mode for all display objects.
-       * @see Container.eventMode
-       * @type {EventMode}
-       * @readonly
-       * @since 7.2.0
-       */
-      static get defaultEventMode() {
-        return this._defaultEventMode;
-      }
-      /**
-       * Runner init called, view is available at this point.
-       * @ignore
-       */
-      init(options) {
-        var _a, _b;
-        const { canvas, resolution } = this.renderer;
-        this.setTargetElement(canvas);
-        this.resolution = resolution;
-        _EventSystem._defaultEventMode = (_a = options.eventMode) != null ? _a : "passive";
-        Object.assign(this.features, (_b = options.eventFeatures) != null ? _b : {});
-        this.rootBoundary.enableGlobalMoveEvents = this.features.globalMove;
-      }
-      /**
-       * Handle changing resolution.
-       * @ignore
-       */
-      resolutionChange(resolution) {
-        this.resolution = resolution;
-      }
-      /** Destroys all event listeners and detaches the renderer. */
-      destroy() {
-        this.setTargetElement(null);
-        this.renderer = null;
-        this._currentCursor = null;
-      }
-      /**
-       * Sets the current cursor mode, handling any callbacks or CSS style changes.
-       * @param mode - cursor mode, a key from the cursorStyles dictionary
-       */
-      setCursor(mode) {
-        mode = mode || "default";
-        let applyStyles = true;
-        if (globalThis.OffscreenCanvas && this.domElement instanceof OffscreenCanvas) {
-          applyStyles = false;
-        }
-        if (this._currentCursor === mode) {
-          return;
-        }
-        this._currentCursor = mode;
-        const style = this.cursorStyles[mode];
-        if (style) {
-          switch (typeof style) {
-            case "string":
-              if (applyStyles) {
-                this.domElement.style.cursor = style;
-              }
-              break;
-            case "function":
-              style(mode);
-              break;
-            case "object":
-              if (applyStyles) {
-                Object.assign(this.domElement.style, style);
-              }
-              break;
-          }
-        } else if (applyStyles && typeof mode === "string" && !Object.prototype.hasOwnProperty.call(this.cursorStyles, mode)) {
-          this.domElement.style.cursor = mode;
-        }
-      }
-      /**
-       * The global pointer event.
-       * Useful for getting the pointer position without listening to events.
-       * @since 7.2.0
-       */
-      get pointer() {
-        return this._rootPointerEvent;
-      }
-      /**
-       * Event handler for pointer down events on {@link EventSystem#domElement this.domElement}.
-       * @param nativeEvent - The native mouse/pointer/touch event.
-       */
-      _onPointerDown(nativeEvent) {
-        if (!this.features.click)
-          return;
-        this.rootBoundary.rootTarget = this.renderer.lastObjectRendered;
-        const events = this._normalizeToPointerData(nativeEvent);
-        if (this.autoPreventDefault && events[0].isNormalized) {
-          const cancelable = nativeEvent.cancelable || !("cancelable" in nativeEvent);
-          if (cancelable) {
-            nativeEvent.preventDefault();
-          }
-        }
-        for (let i = 0, j = events.length; i < j; i++) {
-          const nativeEvent2 = events[i];
-          const federatedEvent = this._bootstrapEvent(this._rootPointerEvent, nativeEvent2);
-          this.rootBoundary.mapEvent(federatedEvent);
-        }
-        this.setCursor(this.rootBoundary.cursor);
-      }
-      /**
-       * Event handler for pointer move events on on {@link EventSystem#domElement this.domElement}.
-       * @param nativeEvent - The native mouse/pointer/touch events.
-       */
-      _onPointerMove(nativeEvent) {
-        if (!this.features.move)
-          return;
-        this.rootBoundary.rootTarget = this.renderer.lastObjectRendered;
-        EventsTicker.pointerMoved();
-        const normalizedEvents = this._normalizeToPointerData(nativeEvent);
-        for (let i = 0, j = normalizedEvents.length; i < j; i++) {
-          const event = this._bootstrapEvent(this._rootPointerEvent, normalizedEvents[i]);
-          this.rootBoundary.mapEvent(event);
-        }
-        this.setCursor(this.rootBoundary.cursor);
-      }
-      /**
-       * Event handler for pointer up events on {@link EventSystem#domElement this.domElement}.
-       * @param nativeEvent - The native mouse/pointer/touch event.
-       */
-      _onPointerUp(nativeEvent) {
-        if (!this.features.click)
-          return;
-        this.rootBoundary.rootTarget = this.renderer.lastObjectRendered;
-        let target = nativeEvent.target;
-        if (nativeEvent.composedPath && nativeEvent.composedPath().length > 0) {
-          target = nativeEvent.composedPath()[0];
-        }
-        const outside = target !== this.domElement ? "outside" : "";
-        const normalizedEvents = this._normalizeToPointerData(nativeEvent);
-        for (let i = 0, j = normalizedEvents.length; i < j; i++) {
-          const event = this._bootstrapEvent(this._rootPointerEvent, normalizedEvents[i]);
-          event.type += outside;
-          this.rootBoundary.mapEvent(event);
-        }
-        this.setCursor(this.rootBoundary.cursor);
-      }
-      /**
-       * Event handler for pointer over & out events on {@link EventSystem#domElement this.domElement}.
-       * @param nativeEvent - The native mouse/pointer/touch event.
-       */
-      _onPointerOverOut(nativeEvent) {
-        if (!this.features.click)
-          return;
-        this.rootBoundary.rootTarget = this.renderer.lastObjectRendered;
-        const normalizedEvents = this._normalizeToPointerData(nativeEvent);
-        for (let i = 0, j = normalizedEvents.length; i < j; i++) {
-          const event = this._bootstrapEvent(this._rootPointerEvent, normalizedEvents[i]);
-          this.rootBoundary.mapEvent(event);
-        }
-        this.setCursor(this.rootBoundary.cursor);
-      }
-      /**
-       * Passive handler for `wheel` events on {@link EventSystem.domElement this.domElement}.
-       * @param nativeEvent - The native wheel event.
-       */
-      onWheel(nativeEvent) {
-        if (!this.features.wheel)
-          return;
-        const wheelEvent = this.normalizeWheelEvent(nativeEvent);
-        this.rootBoundary.rootTarget = this.renderer.lastObjectRendered;
-        this.rootBoundary.mapEvent(wheelEvent);
-      }
-      /**
-       * Sets the {@link EventSystem#domElement domElement} and binds event listeners.
-       *
-       * To deregister the current DOM element without setting a new one, pass {@code null}.
-       * @param element - The new DOM element.
-       */
-      setTargetElement(element) {
-        this._removeEvents();
-        this.domElement = element;
-        EventsTicker.domElement = element;
-        this._addEvents();
-      }
-      /** Register event listeners on {@link Renderer#domElement this.domElement}. */
-      _addEvents() {
-        if (this._eventsAdded || !this.domElement) {
-          return;
-        }
-        EventsTicker.addTickerListener();
-        const style = this.domElement.style;
-        if (style) {
-          if (globalThis.navigator.msPointerEnabled) {
-            style.msContentZooming = "none";
-            style.msTouchAction = "none";
-          } else if (this.supportsPointerEvents) {
-            style.touchAction = "none";
-          }
-        }
-        if (this.supportsPointerEvents) {
-          globalThis.document.addEventListener("pointermove", this._onPointerMove, true);
-          this.domElement.addEventListener("pointerdown", this._onPointerDown, true);
-          this.domElement.addEventListener("pointerleave", this._onPointerOverOut, true);
-          this.domElement.addEventListener("pointerover", this._onPointerOverOut, true);
-          globalThis.addEventListener("pointerup", this._onPointerUp, true);
-        } else {
-          globalThis.document.addEventListener("mousemove", this._onPointerMove, true);
-          this.domElement.addEventListener("mousedown", this._onPointerDown, true);
-          this.domElement.addEventListener("mouseout", this._onPointerOverOut, true);
-          this.domElement.addEventListener("mouseover", this._onPointerOverOut, true);
-          globalThis.addEventListener("mouseup", this._onPointerUp, true);
-          if (this.supportsTouchEvents) {
-            this.domElement.addEventListener("touchstart", this._onPointerDown, true);
-            this.domElement.addEventListener("touchend", this._onPointerUp, true);
-            this.domElement.addEventListener("touchmove", this._onPointerMove, true);
-          }
-        }
-        this.domElement.addEventListener("wheel", this.onWheel, {
-          passive: true,
-          capture: true
-        });
-        this._eventsAdded = true;
-      }
-      /** Unregister event listeners on {@link EventSystem#domElement this.domElement}. */
-      _removeEvents() {
-        if (!this._eventsAdded || !this.domElement) {
-          return;
-        }
-        EventsTicker.removeTickerListener();
-        const style = this.domElement.style;
-        if (style) {
-          if (globalThis.navigator.msPointerEnabled) {
-            style.msContentZooming = "";
-            style.msTouchAction = "";
-          } else if (this.supportsPointerEvents) {
-            style.touchAction = "";
-          }
-        }
-        if (this.supportsPointerEvents) {
-          globalThis.document.removeEventListener("pointermove", this._onPointerMove, true);
-          this.domElement.removeEventListener("pointerdown", this._onPointerDown, true);
-          this.domElement.removeEventListener("pointerleave", this._onPointerOverOut, true);
-          this.domElement.removeEventListener("pointerover", this._onPointerOverOut, true);
-          globalThis.removeEventListener("pointerup", this._onPointerUp, true);
-        } else {
-          globalThis.document.removeEventListener("mousemove", this._onPointerMove, true);
-          this.domElement.removeEventListener("mousedown", this._onPointerDown, true);
-          this.domElement.removeEventListener("mouseout", this._onPointerOverOut, true);
-          this.domElement.removeEventListener("mouseover", this._onPointerOverOut, true);
-          globalThis.removeEventListener("mouseup", this._onPointerUp, true);
-          if (this.supportsTouchEvents) {
-            this.domElement.removeEventListener("touchstart", this._onPointerDown, true);
-            this.domElement.removeEventListener("touchend", this._onPointerUp, true);
-            this.domElement.removeEventListener("touchmove", this._onPointerMove, true);
-          }
-        }
-        this.domElement.removeEventListener("wheel", this.onWheel, true);
-        this.domElement = null;
-        this._eventsAdded = false;
-      }
-      /**
-       * Maps x and y coords from a DOM object and maps them correctly to the PixiJS view. The
-       * resulting value is stored in the point. This takes into account the fact that the DOM
-       * element could be scaled and positioned anywhere on the screen.
-       * @param  {PointData} point - the point that the result will be stored in
-       * @param  {number} x - the x coord of the position to map
-       * @param  {number} y - the y coord of the position to map
-       */
-      mapPositionToPoint(point, x, y) {
-        const rect = this.domElement.isConnected ? this.domElement.getBoundingClientRect() : {
-          x: 0,
-          y: 0,
-          width: this.domElement.width,
-          height: this.domElement.height,
-          left: 0,
-          top: 0
-        };
-        const resolutionMultiplier = 1 / this.resolution;
-        point.x = (x - rect.left) * (this.domElement.width / rect.width) * resolutionMultiplier;
-        point.y = (y - rect.top) * (this.domElement.height / rect.height) * resolutionMultiplier;
-      }
-      /**
-       * Ensures that the original event object contains all data that a regular pointer event would have
-       * @param event - The original event data from a touch or mouse event
-       * @returns An array containing a single normalized pointer event, in the case of a pointer
-       *  or mouse event, or a multiple normalized pointer events if there are multiple changed touches
-       */
-      _normalizeToPointerData(event) {
-        const normalizedEvents = [];
-        if (this.supportsTouchEvents && event instanceof TouchEvent) {
-          for (let i = 0, li = event.changedTouches.length; i < li; i++) {
-            const touch = event.changedTouches[i];
-            if (typeof touch.button === "undefined")
-              touch.button = 0;
-            if (typeof touch.buttons === "undefined")
-              touch.buttons = 1;
-            if (typeof touch.isPrimary === "undefined") {
-              touch.isPrimary = event.touches.length === 1 && event.type === "touchstart";
-            }
-            if (typeof touch.width === "undefined")
-              touch.width = touch.radiusX || 1;
-            if (typeof touch.height === "undefined")
-              touch.height = touch.radiusY || 1;
-            if (typeof touch.tiltX === "undefined")
-              touch.tiltX = 0;
-            if (typeof touch.tiltY === "undefined")
-              touch.tiltY = 0;
-            if (typeof touch.pointerType === "undefined")
-              touch.pointerType = "touch";
-            if (typeof touch.pointerId === "undefined")
-              touch.pointerId = touch.identifier || 0;
-            if (typeof touch.pressure === "undefined")
-              touch.pressure = touch.force || 0.5;
-            if (typeof touch.twist === "undefined")
-              touch.twist = 0;
-            if (typeof touch.tangentialPressure === "undefined")
-              touch.tangentialPressure = 0;
-            if (typeof touch.layerX === "undefined")
-              touch.layerX = touch.offsetX = touch.clientX;
-            if (typeof touch.layerY === "undefined")
-              touch.layerY = touch.offsetY = touch.clientY;
-            touch.isNormalized = true;
-            touch.type = event.type;
-            normalizedEvents.push(touch);
-          }
-        } else if (!globalThis.MouseEvent || event instanceof MouseEvent && (!this.supportsPointerEvents || !(event instanceof globalThis.PointerEvent))) {
-          const tempEvent = event;
-          if (typeof tempEvent.isPrimary === "undefined")
-            tempEvent.isPrimary = true;
-          if (typeof tempEvent.width === "undefined")
-            tempEvent.width = 1;
-          if (typeof tempEvent.height === "undefined")
-            tempEvent.height = 1;
-          if (typeof tempEvent.tiltX === "undefined")
-            tempEvent.tiltX = 0;
-          if (typeof tempEvent.tiltY === "undefined")
-            tempEvent.tiltY = 0;
-          if (typeof tempEvent.pointerType === "undefined")
-            tempEvent.pointerType = "mouse";
-          if (typeof tempEvent.pointerId === "undefined")
-            tempEvent.pointerId = MOUSE_POINTER_ID;
-          if (typeof tempEvent.pressure === "undefined")
-            tempEvent.pressure = 0.5;
-          if (typeof tempEvent.twist === "undefined")
-            tempEvent.twist = 0;
-          if (typeof tempEvent.tangentialPressure === "undefined")
-            tempEvent.tangentialPressure = 0;
-          tempEvent.isNormalized = true;
-          normalizedEvents.push(tempEvent);
-        } else {
-          normalizedEvents.push(event);
-        }
-        return normalizedEvents;
-      }
-      /**
-       * Normalizes the native {@link https://w3c.github.io/uievents/#interface-wheelevent WheelEvent}.
-       *
-       * The returned {@link FederatedWheelEvent} is a shared instance. It will not persist across
-       * multiple native wheel events.
-       * @param nativeEvent - The native wheel event that occurred on the canvas.
-       * @returns A federated wheel event.
-       */
-      normalizeWheelEvent(nativeEvent) {
-        const event = this._rootWheelEvent;
-        this._transferMouseData(event, nativeEvent);
-        event.deltaX = nativeEvent.deltaX;
-        event.deltaY = nativeEvent.deltaY;
-        event.deltaZ = nativeEvent.deltaZ;
-        event.deltaMode = nativeEvent.deltaMode;
-        this.mapPositionToPoint(event.screen, nativeEvent.clientX, nativeEvent.clientY);
-        event.global.copyFrom(event.screen);
-        event.offset.copyFrom(event.screen);
-        event.nativeEvent = nativeEvent;
-        event.type = nativeEvent.type;
-        return event;
-      }
-      /**
-       * Normalizes the `nativeEvent` into a federateed {@link FederatedPointerEvent}.
-       * @param event
-       * @param nativeEvent
-       */
-      _bootstrapEvent(event, nativeEvent) {
-        event.originalEvent = null;
-        event.nativeEvent = nativeEvent;
-        event.pointerId = nativeEvent.pointerId;
-        event.width = nativeEvent.width;
-        event.height = nativeEvent.height;
-        event.isPrimary = nativeEvent.isPrimary;
-        event.pointerType = nativeEvent.pointerType;
-        event.pressure = nativeEvent.pressure;
-        event.tangentialPressure = nativeEvent.tangentialPressure;
-        event.tiltX = nativeEvent.tiltX;
-        event.tiltY = nativeEvent.tiltY;
-        event.twist = nativeEvent.twist;
-        this._transferMouseData(event, nativeEvent);
-        this.mapPositionToPoint(event.screen, nativeEvent.clientX, nativeEvent.clientY);
-        event.global.copyFrom(event.screen);
-        event.offset.copyFrom(event.screen);
-        event.isTrusted = nativeEvent.isTrusted;
-        if (event.type === "pointerleave") {
-          event.type = "pointerout";
-        }
-        if (event.type.startsWith("mouse")) {
-          event.type = event.type.replace("mouse", "pointer");
-        }
-        if (event.type.startsWith("touch")) {
-          event.type = TOUCH_TO_POINTER[event.type] || event.type;
-        }
-        return event;
-      }
-      /**
-       * Transfers base & mouse event data from the {@code nativeEvent} to the federated event.
-       * @param event
-       * @param nativeEvent
-       */
-      _transferMouseData(event, nativeEvent) {
-        event.isTrusted = nativeEvent.isTrusted;
-        event.srcElement = nativeEvent.srcElement;
-        event.timeStamp = performance.now();
-        event.type = nativeEvent.type;
-        event.altKey = nativeEvent.altKey;
-        event.button = nativeEvent.button;
-        event.buttons = nativeEvent.buttons;
-        event.client.x = nativeEvent.clientX;
-        event.client.y = nativeEvent.clientY;
-        event.ctrlKey = nativeEvent.ctrlKey;
-        event.metaKey = nativeEvent.metaKey;
-        event.movement.x = nativeEvent.movementX;
-        event.movement.y = nativeEvent.movementY;
-        event.page.x = nativeEvent.pageX;
-        event.page.y = nativeEvent.pageY;
-        event.relatedTarget = null;
-        event.shiftKey = nativeEvent.shiftKey;
-      }
-    };
-    /** @ignore */
-    _EventSystem.extension = {
-      name: "events",
-      type: [
-        ExtensionType.WebGLSystem,
-        ExtensionType.CanvasSystem,
-        ExtensionType.WebGPUSystem
-      ],
-      priority: -1
-    };
-    /**
-     * The event features that are enabled by the EventSystem
-     * (included in the **pixi.js** and **pixi.js-legacy** bundle), otherwise it will be ignored.
-     * @since 7.2.0
-     */
-    _EventSystem.defaultEventFeatures = {
-      /** Enables pointer events associated with pointer movement. */
-      move: true,
-      /** Enables global pointer move events. */
-      globalMove: true,
-      /** Enables pointer events associated with clicking. */
-      click: true,
-      /** Enables wheel events. */
-      wheel: true
-    };
-    let EventSystem = _EventSystem;
-
-    "use strict";
-    const FederatedContainer = {
-      /**
-       * Property-based event handler for the `click` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onclick = (event) => {
-       *  //some function here that happens on click
-       * }
-       */
-      onclick: null,
-      /**
-       * Property-based event handler for the `mousedown` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmousedown = (event) => {
-       *  //some function here that happens on mousedown
-       * }
-       */
-      onmousedown: null,
-      /**
-       * Property-based event handler for the `mouseenter` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmouseenter = (event) => {
-       *  //some function here that happens on mouseenter
-       * }
-       */
-      onmouseenter: null,
-      /**
-       * Property-based event handler for the `mouseleave` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmouseleave = (event) => {
-       *  //some function here that happens on mouseleave
-       * }
-       */
-      onmouseleave: null,
-      /**
-       * Property-based event handler for the `mousemove` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmousemove = (event) => {
-       *  //some function here that happens on mousemove
-       * }
-       */
-      onmousemove: null,
-      /**
-       * Property-based event handler for the `globalmousemove` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onglobalmousemove = (event) => {
-       *  //some function here that happens on globalmousemove
-       * }
-       */
-      onglobalmousemove: null,
-      /**
-       * Property-based event handler for the `mouseout` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmouseout = (event) => {
-       *  //some function here that happens on mouseout
-       * }
-       */
-      onmouseout: null,
-      /**
-       * Property-based event handler for the `mouseover` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmouseover = (event) => {
-       *  //some function here that happens on mouseover
-       * }
-       */
-      onmouseover: null,
-      /**
-       * Property-based event handler for the `mouseup` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmouseup = (event) => {
-       *  //some function here that happens on mouseup
-       * }
-       */
-      onmouseup: null,
-      /**
-       * Property-based event handler for the `mouseupoutside` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onmouseupoutside = (event) => {
-       *  //some function here that happens on mouseupoutside
-       * }
-       */
-      onmouseupoutside: null,
-      /**
-       * Property-based event handler for the `pointercancel` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointercancel = (event) => {
-       *  //some function here that happens on pointercancel
-       * }
-       */
-      onpointercancel: null,
-      /**
-       * Property-based event handler for the `pointerdown` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointerdown = (event) => {
-       *  //some function here that happens on pointerdown
-       * }
-       */
-      onpointerdown: null,
-      /**
-       * Property-based event handler for the `pointerenter` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointerenter = (event) => {
-       *  //some function here that happens on pointerenter
-       * }
-       */
-      onpointerenter: null,
-      /**
-       * Property-based event handler for the `pointerleave` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointerleave = (event) => {
-       *  //some function here that happens on pointerleave
-       * }
-       */
-      onpointerleave: null,
-      /**
-       * Property-based event handler for the `pointermove` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointermove = (event) => {
-       *  //some function here that happens on pointermove
-       * }
-       */
-      onpointermove: null,
-      /**
-       * Property-based event handler for the `globalpointermove` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onglobalpointermove = (event) => {
-       *  //some function here that happens on globalpointermove
-       * }
-       */
-      onglobalpointermove: null,
-      /**
-       * Property-based event handler for the `pointerout` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointerout = (event) => {
-       *  //some function here that happens on pointerout
-       * }
-       */
-      onpointerout: null,
-      /**
-       * Property-based event handler for the `pointerover` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointerover = (event) => {
-       *  //some function here that happens on pointerover
-       * }
-       */
-      onpointerover: null,
-      /**
-       * Property-based event handler for the `pointertap` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointertap = (event) => {
-       *  //some function here that happens on pointertap
-       * }
-       */
-      onpointertap: null,
-      /**
-       * Property-based event handler for the `pointerup` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointerup = (event) => {
-       *  //some function here that happens on pointerup
-       * }
-       */
-      onpointerup: null,
-      /**
-       * Property-based event handler for the `pointerupoutside` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onpointerupoutside = (event) => {
-       *  //some function here that happens on pointerupoutside
-       * }
-       */
-      onpointerupoutside: null,
-      /**
-       * Property-based event handler for the `rightclick` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onrightclick = (event) => {
-       *  //some function here that happens on rightclick
-       * }
-       */
-      onrightclick: null,
-      /**
-       * Property-based event handler for the `rightdown` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onrightdown = (event) => {
-       *  //some function here that happens on rightdown
-       * }
-       */
-      onrightdown: null,
-      /**
-       * Property-based event handler for the `rightup` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onrightup = (event) => {
-       *  //some function here that happens on rightup
-       * }
-       */
-      onrightup: null,
-      /**
-       * Property-based event handler for the `rightupoutside` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onrightupoutside = (event) => {
-       *  //some function here that happens on rightupoutside
-       * }
-       */
-      onrightupoutside: null,
-      /**
-       * Property-based event handler for the `tap` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.ontap = (event) => {
-       *  //some function here that happens on tap
-       * }
-       */
-      ontap: null,
-      /**
-       * Property-based event handler for the `touchcancel` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.ontouchcancel = (event) => {
-       *  //some function here that happens on touchcancel
-       * }
-       */
-      ontouchcancel: null,
-      /**
-       * Property-based event handler for the `touchend` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.ontouchend = (event) => {
-       *  //some function here that happens on touchend
-       * }
-       */
-      ontouchend: null,
-      /**
-       * Property-based event handler for the `touchendoutside` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.ontouchendoutside = (event) => {
-       *  //some function here that happens on touchendoutside
-       * }
-       */
-      ontouchendoutside: null,
-      /**
-       * Property-based event handler for the `touchmove` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.ontouchmove = (event) => {
-       *  //some function here that happens on touchmove
-       * }
-       */
-      ontouchmove: null,
-      /**
-       * Property-based event handler for the `globaltouchmove` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onglobaltouchmove = (event) => {
-       *  //some function here that happens on globaltouchmove
-       * }
-       */
-      onglobaltouchmove: null,
-      /**
-       * Property-based event handler for the `touchstart` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.ontouchstart = (event) => {
-       *  //some function here that happens on touchstart
-       * }
-       */
-      ontouchstart: null,
-      /**
-       * Property-based event handler for the `wheel` event.
-       * @memberof scene.Container#
-       * @default null
-       * @example
-       * this.onwheel = (event) => {
-       *  //some function here that happens on wheel
-       * }
-       */
-      onwheel: null,
-      /**
-       * Enable interaction events for the Container. Touch, pointer and mouse
-       * @memberof scene.Container#
-       */
-      get interactive() {
-        return this.eventMode === "dynamic" || this.eventMode === "static";
-      },
-      set interactive(value) {
-        this.eventMode = value ? "static" : "passive";
-      },
-      /**
-       * @ignore
-       */
-      _internalEventMode: void 0,
-      /**
-       * Enable interaction events for the Container. Touch, pointer and mouse.
-       * There are 5 types of interaction settings:
-       * - `'none'`: Ignores all interaction events, even on its children.
-       * - `'passive'`: **(default)** Does not emit events and ignores all hit testing on itself and non-interactive children.
-       * Interactive children will still emit events.
-       * - `'auto'`: Does not emit events but is hit tested if parent is interactive. Same as `interactive = false` in v7
-       * - `'static'`: Emit events and is hit tested. Same as `interaction = true` in v7
-       * - `'dynamic'`: Emits events and is hit tested but will also receive mock interaction events fired from a ticker to
-       * allow for interaction when the mouse isn't moving
-       * @example
-       * import { Sprite } from 'pixi.js';
-       *
-       * const sprite = new Sprite(texture);
-       * sprite.eventMode = 'static';
-       * sprite.on('tap', (event) => {
-       *     // Handle event
-       * });
-       * @memberof scene.Container#
-       * @since 7.2.0
-       */
-      get eventMode() {
-        var _a;
-        return (_a = this._internalEventMode) != null ? _a : EventSystem.defaultEventMode;
-      },
-      set eventMode(value) {
-        this._internalEventMode = value;
-      },
-      /**
-       * Determines if the container is interactive or not
-       * @returns {boolean} Whether the container is interactive or not
-       * @memberof scene.Container#
-       * @since 7.2.0
-       * @example
-       * import { Sprite } from 'pixi.js';
-       *
-       * const sprite = new Sprite(texture);
-       * sprite.eventMode = 'static';
-       * sprite.isInteractive(); // true
-       *
-       * sprite.eventMode = 'dynamic';
-       * sprite.isInteractive(); // true
-       *
-       * sprite.eventMode = 'none';
-       * sprite.isInteractive(); // false
-       *
-       * sprite.eventMode = 'passive';
-       * sprite.isInteractive(); // false
-       *
-       * sprite.eventMode = 'auto';
-       * sprite.isInteractive(); // false
-       */
-      isInteractive() {
-        return this.eventMode === "static" || this.eventMode === "dynamic";
-      },
-      /**
-       * Determines if the children to the container can be clicked/touched
-       * Setting this to false allows PixiJS to bypass a recursive `hitTest` function
-       * @memberof scene.Container#
-       */
-      interactiveChildren: true,
-      /**
-       * Interaction shape. Children will be hit first, then this shape will be checked.
-       * Setting this will cause this shape to be checked in hit tests rather than the container's bounds.
-       * @example
-       * import { Rectangle, Sprite } from 'pixi.js';
-       *
-       * const sprite = new Sprite(texture);
-       * sprite.interactive = true;
-       * sprite.hitArea = new Rectangle(0, 0, 100, 100);
-       * @member {IHitArea}
-       * @memberof scene.Container#
-       */
-      hitArea: null,
-      /**
-       * Unlike `on` or `addListener` which are methods from EventEmitter, `addEventListener`
-       * seeks to be compatible with the DOM's `addEventListener` with support for options.
-       * @memberof scene.Container
-       * @param type - The type of event to listen to.
-       * @param listener - The listener callback or object.
-       * @param options - Listener options, used for capture phase.
-       * @example
-       * // Tell the user whether they did a single, double, triple, or nth click.
-       * button.addEventListener('click', {
-       *     handleEvent(e): {
-       *         let prefix;
-       *
-       *         switch (e.detail) {
-       *             case 1: prefix = 'single'; break;
-       *             case 2: prefix = 'double'; break;
-       *             case 3: prefix = 'triple'; break;
-       *             default: prefix = e.detail + 'th'; break;
-       *         }
-       *
-       *         console.log('That was a ' + prefix + 'click');
-       *     }
-       * });
-       *
-       * // But skip the first click!
-       * button.parent.addEventListener('click', function blockClickOnce(e) {
-       *     e.stopImmediatePropagation();
-       *     button.parent.removeEventListener('click', blockClickOnce, true);
-       * }, {
-       *     capture: true,
-       * });
-       */
-      addEventListener(type, listener, options) {
-        const capture = typeof options === "boolean" && options || typeof options === "object" && options.capture;
-        const once = typeof options === "object" ? options.once === true : false;
-        const signal = typeof options === "object" ? options.signal : null;
-        const context = typeof listener === "function" ? void 0 : listener;
-        type = capture ? `${type}capture` : type;
-        listener = typeof listener === "function" ? listener : listener.handleEvent;
-        const emitter = this;
-        if (signal) {
-          const extractedListenerFn = listener;
-          listener = (e) => {
-            if (signal.aborted) {
-              return;
-            }
-            extractedListenerFn(e);
-          };
-          signal.addEventListener("abort", () => {
-            emitter.off(type, listener, context);
-          });
-        }
-        if (once) {
-          emitter.once(type, listener, context);
-        } else {
-          emitter.on(type, listener, context);
-        }
-      },
-      /**
-       * Unlike `off` or `removeListener` which are methods from EventEmitter, `removeEventListener`
-       * seeks to be compatible with the DOM's `removeEventListener` with support for options.
-       * @memberof scene.Container
-       * @param type - The type of event the listener is bound to.
-       * @param listener - The listener callback or object.
-       * @param options - The original listener options. This is required to deregister a capture phase listener.
-       */
-      removeEventListener(type, listener, options) {
-        const capture = typeof options === "boolean" && options || typeof options === "object" && options.capture;
-        const context = typeof listener === "function" ? void 0 : listener;
-        type = capture ? `${type}capture` : type;
-        listener = typeof listener === "function" ? listener : listener.handleEvent;
-        this.off(type, listener, context);
-      },
-      /**
-       * Dispatch the event on this {@link Container} using the event's {@link EventBoundary}.
-       *
-       * The target of the event is set to `this` and the `defaultPrevented` flag is cleared before dispatch.
-       * @memberof scene.Container
-       * @param e - The event to dispatch.
-       * @returns Whether the {@link FederatedEvent.preventDefault preventDefault}() method was not invoked.
-       * @example
-       * // Reuse a click event!
-       * button.dispatchEvent(clickEvent);
-       */
-      dispatchEvent(e) {
-        if (!(e instanceof FederatedEvent)) {
-          throw new Error("Container cannot propagate events outside of the Federated Events API");
-        }
-        e.defaultPrevented = false;
-        e.path = null;
-        e.target = this;
-        e.manager.dispatchEvent(e);
-        return !e.defaultPrevented;
-      }
-    };
-
-    "use strict";
-    extensions.add(EventSystem);
-    Container.mixin(FederatedContainer);
-
-    "use strict";
-    var LoaderParserPriority = /* @__PURE__ */ ((LoaderParserPriority2) => {
-      LoaderParserPriority2[LoaderParserPriority2["Low"] = 0] = "Low";
-      LoaderParserPriority2[LoaderParserPriority2["Normal"] = 1] = "Normal";
-      LoaderParserPriority2[LoaderParserPriority2["High"] = 2] = "High";
-      return LoaderParserPriority2;
-    })(LoaderParserPriority || {});
-
-    "use strict";
-    const BrowserAdapter = {
-      createCanvas: (width, height) => {
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        return canvas;
-      },
-      getCanvasRenderingContext2D: () => CanvasRenderingContext2D,
-      getWebGLRenderingContext: () => WebGLRenderingContext,
-      getNavigator: () => navigator,
-      getBaseUrl: () => {
-        var _a;
-        return (_a = document.baseURI) != null ? _a : window.location.href;
-      },
-      getFontFaceSet: () => document.fonts,
-      fetch: (url, options) => fetch(url, options),
-      parseXML: (xml) => {
-        const parser = new DOMParser();
-        return parser.parseFromString(xml, "text/xml");
-      }
-    };
-
-    "use strict";
-    let currentAdapter = BrowserAdapter;
-    const DOMAdapter = {
-      /**
-       * Returns the current adapter.
-       * @returns {environment.Adapter} The current adapter.
-       */
-      get() {
-        return currentAdapter;
-      },
-      /**
-       * Sets the current adapter.
-       * @param adapter - The new adapter.
-       */
-      set(adapter) {
-        currentAdapter = adapter;
-      }
-    };
-
-    "use strict";
-    function assertPath(path2) {
-      if (typeof path2 !== "string") {
-        throw new TypeError(`Path must be a string. Received ${JSON.stringify(path2)}`);
-      }
-    }
-    function removeUrlParams(url) {
-      const re = url.split("?")[0];
-      return re.split("#")[0];
-    }
-    function escapeRegExp(string) {
-      return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    }
-    function replaceAll(str, find, replace) {
-      return str.replace(new RegExp(escapeRegExp(find), "g"), replace);
-    }
-    function normalizeStringPosix(path2, allowAboveRoot) {
-      let res = "";
-      let lastSegmentLength = 0;
-      let lastSlash = -1;
-      let dots = 0;
-      let code = -1;
-      for (let i = 0; i <= path2.length; ++i) {
-        if (i < path2.length) {
-          code = path2.charCodeAt(i);
-        } else if (code === 47) {
-          break;
-        } else {
-          code = 47;
-        }
-        if (code === 47) {
-          if (lastSlash === i - 1 || dots === 1) {
-          } else if (lastSlash !== i - 1 && dots === 2) {
-            if (res.length < 2 || lastSegmentLength !== 2 || res.charCodeAt(res.length - 1) !== 46 || res.charCodeAt(res.length - 2) !== 46) {
-              if (res.length > 2) {
-                const lastSlashIndex = res.lastIndexOf("/");
-                if (lastSlashIndex !== res.length - 1) {
-                  if (lastSlashIndex === -1) {
-                    res = "";
-                    lastSegmentLength = 0;
-                  } else {
-                    res = res.slice(0, lastSlashIndex);
-                    lastSegmentLength = res.length - 1 - res.lastIndexOf("/");
-                  }
-                  lastSlash = i;
-                  dots = 0;
-                  continue;
-                }
-              } else if (res.length === 2 || res.length === 1) {
-                res = "";
-                lastSegmentLength = 0;
-                lastSlash = i;
-                dots = 0;
-                continue;
-              }
-            }
-            if (allowAboveRoot) {
-              if (res.length > 0) {
-                res += "/..";
-              } else {
-                res = "..";
-              }
-              lastSegmentLength = 2;
-            }
-          } else {
-            if (res.length > 0) {
-              res += `/${path2.slice(lastSlash + 1, i)}`;
-            } else {
-              res = path2.slice(lastSlash + 1, i);
-            }
-            lastSegmentLength = i - lastSlash - 1;
-          }
-          lastSlash = i;
-          dots = 0;
-        } else if (code === 46 && dots !== -1) {
-          ++dots;
-        } else {
-          dots = -1;
-        }
-      }
-      return res;
-    }
-    const path = {
-      /**
-       * Converts a path to posix format.
-       * @param path - The path to convert to posix
-       */
-      toPosix(path2) {
-        return replaceAll(path2, "\\", "/");
-      },
-      /**
-       * Checks if the path is a URL e.g. http://, https://
-       * @param path - The path to check
-       */
-      isUrl(path2) {
-        return /^https?:/.test(this.toPosix(path2));
-      },
-      /**
-       * Checks if the path is a data URL
-       * @param path - The path to check
-       */
-      isDataUrl(path2) {
-        return /^data:([a-z]+\/[a-z0-9-+.]+(;[a-z0-9-.!#$%*+.{}|~`]+=[a-z0-9-.!#$%*+.{}()_|~`]+)*)?(;base64)?,([a-z0-9!$&',()*+;=\-._~:@\/?%\s<>]*?)$/i.test(path2);
-      },
-      /**
-       * Checks if the path is a blob URL
-       * @param path - The path to check
-       */
-      isBlobUrl(path2) {
-        return path2.startsWith("blob:");
-      },
-      /**
-       * Checks if the path has a protocol e.g. http://, https://, file:///, data:, blob:, C:/
-       * This will return true for windows file paths
-       * @param path - The path to check
-       */
-      hasProtocol(path2) {
-        return /^[^/:]+:/.test(this.toPosix(path2));
-      },
-      /**
-       * Returns the protocol of the path e.g. http://, https://, file:///, data:, blob:, C:/
-       * @param path - The path to get the protocol from
-       */
-      getProtocol(path2) {
-        assertPath(path2);
-        path2 = this.toPosix(path2);
-        const matchFile = /^file:\/\/\//.exec(path2);
-        if (matchFile) {
-          return matchFile[0];
-        }
-        const matchProtocol = /^[^/:]+:\/{0,2}/.exec(path2);
-        if (matchProtocol) {
-          return matchProtocol[0];
-        }
-        return "";
-      },
-      /**
-       * Converts URL to an absolute path.
-       * When loading from a Web Worker, we must use absolute paths.
-       * If the URL is already absolute we return it as is
-       * If it's not, we convert it
-       * @param url - The URL to test
-       * @param customBaseUrl - The base URL to use
-       * @param customRootUrl - The root URL to use
-       */
-      toAbsolute(url, customBaseUrl, customRootUrl) {
-        assertPath(url);
-        if (this.isDataUrl(url) || this.isBlobUrl(url))
-          return url;
-        const baseUrl = removeUrlParams(this.toPosix(customBaseUrl != null ? customBaseUrl : DOMAdapter.get().getBaseUrl()));
-        const rootUrl = removeUrlParams(this.toPosix(customRootUrl != null ? customRootUrl : this.rootname(baseUrl)));
-        url = this.toPosix(url);
-        if (url.startsWith("/")) {
-          return path.join(rootUrl, url.slice(1));
-        }
-        const absolutePath = this.isAbsolute(url) ? url : this.join(baseUrl, url);
-        return absolutePath;
-      },
-      /**
-       * Normalizes the given path, resolving '..' and '.' segments
-       * @param path - The path to normalize
-       */
-      normalize(path2) {
-        assertPath(path2);
-        if (path2.length === 0)
-          return ".";
-        if (this.isDataUrl(path2) || this.isBlobUrl(path2))
-          return path2;
-        path2 = this.toPosix(path2);
-        let protocol = "";
-        const isAbsolute = path2.startsWith("/");
-        if (this.hasProtocol(path2)) {
-          protocol = this.rootname(path2);
-          path2 = path2.slice(protocol.length);
-        }
-        const trailingSeparator = path2.endsWith("/");
-        path2 = normalizeStringPosix(path2, false);
-        if (path2.length > 0 && trailingSeparator)
-          path2 += "/";
-        if (isAbsolute)
-          return `/${path2}`;
-        return protocol + path2;
-      },
-      /**
-       * Determines if path is an absolute path.
-       * Absolute paths can be urls, data urls, or paths on disk
-       * @param path - The path to test
-       */
-      isAbsolute(path2) {
-        assertPath(path2);
-        path2 = this.toPosix(path2);
-        if (this.hasProtocol(path2))
-          return true;
-        return path2.startsWith("/");
-      },
-      /**
-       * Joins all given path segments together using the platform-specific separator as a delimiter,
-       * then normalizes the resulting path
-       * @param segments - The segments of the path to join
-       */
-      join(...segments) {
-        var _a;
-        if (segments.length === 0) {
-          return ".";
-        }
-        let joined;
-        for (let i = 0; i < segments.length; ++i) {
-          const arg = segments[i];
-          assertPath(arg);
-          if (arg.length > 0) {
-            if (joined === void 0)
-              joined = arg;
-            else {
-              const prevArg = (_a = segments[i - 1]) != null ? _a : "";
-              if (this.joinExtensions.includes(this.extname(prevArg).toLowerCase())) {
-                joined += `/../${arg}`;
-              } else {
-                joined += `/${arg}`;
-              }
-            }
-          }
-        }
-        if (joined === void 0) {
-          return ".";
-        }
-        return this.normalize(joined);
-      },
-      /**
-       * Returns the directory name of a path
-       * @param path - The path to parse
-       */
-      dirname(path2) {
-        assertPath(path2);
-        if (path2.length === 0)
-          return ".";
-        path2 = this.toPosix(path2);
-        let code = path2.charCodeAt(0);
-        const hasRoot = code === 47;
-        let end = -1;
-        let matchedSlash = true;
-        const proto = this.getProtocol(path2);
-        const origpath = path2;
-        path2 = path2.slice(proto.length);
-        for (let i = path2.length - 1; i >= 1; --i) {
-          code = path2.charCodeAt(i);
-          if (code === 47) {
-            if (!matchedSlash) {
-              end = i;
-              break;
-            }
-          } else {
-            matchedSlash = false;
-          }
-        }
-        if (end === -1)
-          return hasRoot ? "/" : this.isUrl(origpath) ? proto + path2 : proto;
-        if (hasRoot && end === 1)
-          return "//";
-        return proto + path2.slice(0, end);
-      },
-      /**
-       * Returns the root of the path e.g. /, C:/, file:///, http://domain.com/
-       * @param path - The path to parse
-       */
-      rootname(path2) {
-        assertPath(path2);
-        path2 = this.toPosix(path2);
-        let root = "";
-        if (path2.startsWith("/"))
-          root = "/";
-        else {
-          root = this.getProtocol(path2);
-        }
-        if (this.isUrl(path2)) {
-          const index = path2.indexOf("/", root.length);
-          if (index !== -1) {
-            root = path2.slice(0, index);
-          } else
-            root = path2;
-          if (!root.endsWith("/"))
-            root += "/";
-        }
-        return root;
-      },
-      /**
-       * Returns the last portion of a path
-       * @param path - The path to test
-       * @param ext - Optional extension to remove
-       */
-      basename(path2, ext) {
-        assertPath(path2);
-        if (ext)
-          assertPath(ext);
-        path2 = removeUrlParams(this.toPosix(path2));
-        let start = 0;
-        let end = -1;
-        let matchedSlash = true;
-        let i;
-        if (ext !== void 0 && ext.length > 0 && ext.length <= path2.length) {
-          if (ext.length === path2.length && ext === path2)
-            return "";
-          let extIdx = ext.length - 1;
-          let firstNonSlashEnd = -1;
-          for (i = path2.length - 1; i >= 0; --i) {
-            const code = path2.charCodeAt(i);
-            if (code === 47) {
-              if (!matchedSlash) {
-                start = i + 1;
-                break;
-              }
-            } else {
-              if (firstNonSlashEnd === -1) {
-                matchedSlash = false;
-                firstNonSlashEnd = i + 1;
-              }
-              if (extIdx >= 0) {
-                if (code === ext.charCodeAt(extIdx)) {
-                  if (--extIdx === -1) {
-                    end = i;
-                  }
-                } else {
-                  extIdx = -1;
-                  end = firstNonSlashEnd;
-                }
-              }
-            }
-          }
-          if (start === end)
-            end = firstNonSlashEnd;
-          else if (end === -1)
-            end = path2.length;
-          return path2.slice(start, end);
-        }
-        for (i = path2.length - 1; i >= 0; --i) {
-          if (path2.charCodeAt(i) === 47) {
-            if (!matchedSlash) {
-              start = i + 1;
-              break;
-            }
-          } else if (end === -1) {
-            matchedSlash = false;
-            end = i + 1;
-          }
-        }
-        if (end === -1)
-          return "";
-        return path2.slice(start, end);
-      },
-      /**
-       * Returns the extension of the path, from the last occurrence of the . (period) character to end of string in the last
-       * portion of the path. If there is no . in the last portion of the path, or if there are no . characters other than
-       * the first character of the basename of path, an empty string is returned.
-       * @param path - The path to parse
-       */
-      extname(path2) {
-        assertPath(path2);
-        path2 = removeUrlParams(this.toPosix(path2));
-        let startDot = -1;
-        let startPart = 0;
-        let end = -1;
-        let matchedSlash = true;
-        let preDotState = 0;
-        for (let i = path2.length - 1; i >= 0; --i) {
-          const code = path2.charCodeAt(i);
-          if (code === 47) {
-            if (!matchedSlash) {
-              startPart = i + 1;
-              break;
-            }
-            continue;
-          }
-          if (end === -1) {
-            matchedSlash = false;
-            end = i + 1;
-          }
-          if (code === 46) {
-            if (startDot === -1)
-              startDot = i;
-            else if (preDotState !== 1)
-              preDotState = 1;
-          } else if (startDot !== -1) {
-            preDotState = -1;
-          }
-        }
-        if (startDot === -1 || end === -1 || preDotState === 0 || preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
-          return "";
-        }
-        return path2.slice(startDot, end);
-      },
-      /**
-       * Parses a path into an object containing the 'root', `dir`, `base`, `ext`, and `name` properties.
-       * @param path - The path to parse
-       */
-      parse(path2) {
-        assertPath(path2);
-        const ret = { root: "", dir: "", base: "", ext: "", name: "" };
-        if (path2.length === 0)
-          return ret;
-        path2 = removeUrlParams(this.toPosix(path2));
-        let code = path2.charCodeAt(0);
-        const isAbsolute = this.isAbsolute(path2);
-        let start;
-        const protocol = "";
-        ret.root = this.rootname(path2);
-        if (isAbsolute || this.hasProtocol(path2)) {
-          start = 1;
-        } else {
-          start = 0;
-        }
-        let startDot = -1;
-        let startPart = 0;
-        let end = -1;
-        let matchedSlash = true;
-        let i = path2.length - 1;
-        let preDotState = 0;
-        for (; i >= start; --i) {
-          code = path2.charCodeAt(i);
-          if (code === 47) {
-            if (!matchedSlash) {
-              startPart = i + 1;
-              break;
-            }
-            continue;
-          }
-          if (end === -1) {
-            matchedSlash = false;
-            end = i + 1;
-          }
-          if (code === 46) {
-            if (startDot === -1)
-              startDot = i;
-            else if (preDotState !== 1)
-              preDotState = 1;
-          } else if (startDot !== -1) {
-            preDotState = -1;
-          }
-        }
-        if (startDot === -1 || end === -1 || preDotState === 0 || preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
-          if (end !== -1) {
-            if (startPart === 0 && isAbsolute)
-              ret.base = ret.name = path2.slice(1, end);
-            else
-              ret.base = ret.name = path2.slice(startPart, end);
-          }
-        } else {
-          if (startPart === 0 && isAbsolute) {
-            ret.name = path2.slice(1, startDot);
-            ret.base = path2.slice(1, end);
-          } else {
-            ret.name = path2.slice(startPart, startDot);
-            ret.base = path2.slice(startPart, end);
-          }
-          ret.ext = path2.slice(startDot, end);
-        }
-        ret.dir = this.dirname(path2);
-        if (protocol)
-          ret.dir = protocol + ret.dir;
-        return ret;
-      },
-      sep: "/",
-      delimiter: ":",
-      joinExtensions: [".html"]
-    };
-
-    "use strict";
-    const convertToList = (input, transform, forceTransform = false) => {
-      if (!Array.isArray(input)) {
-        input = [input];
-      }
-      if (!transform) {
-        return input;
-      }
-      return input.map((item) => {
-        if (typeof item === "string" || forceTransform) {
-          return transform(item);
-        }
-        return item;
-      });
-    };
-
-    "use strict";
-    function processX(base, ids, depth, result, tags) {
-      const id = ids[depth];
-      for (let i = 0; i < id.length; i++) {
-        const value = id[i];
-        if (depth < ids.length - 1) {
-          processX(base.replace(result[depth], value), ids, depth + 1, result, tags);
-        } else {
-          tags.push(base.replace(result[depth], value));
-        }
-      }
-    }
-    function createStringVariations(string) {
-      const regex = /\{(.*?)\}/g;
-      const result = string.match(regex);
-      const tags = [];
-      if (result) {
-        const ids = [];
-        result.forEach((vars) => {
-          const split = vars.substring(1, vars.length - 1).split(",");
-          ids.push(split);
-        });
-        processX(string, ids, 0, result, tags);
-      } else {
-        tags.push(string);
-      }
-      return tags;
-    }
-
-    "use strict";
-    const isSingleItem = (item) => !Array.isArray(item);
-
-    "use strict";
-    var __defProp$T = Object.defineProperty;
-    var __getOwnPropSymbols$T = Object.getOwnPropertySymbols;
-    var __hasOwnProp$T = Object.prototype.hasOwnProperty;
-    var __propIsEnum$T = Object.prototype.propertyIsEnumerable;
-    var __defNormalProp$T = (obj, key, value) => key in obj ? __defProp$T(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-    var __spreadValues$T = (a, b) => {
-      for (var prop in b || (b = {}))
-        if (__hasOwnProp$T.call(b, prop))
-          __defNormalProp$T(a, prop, b[prop]);
-      if (__getOwnPropSymbols$T)
-        for (var prop of __getOwnPropSymbols$T(b)) {
-          if (__propIsEnum$T.call(b, prop))
-            __defNormalProp$T(a, prop, b[prop]);
-        }
-      return a;
-    };
-    class Resolver {
-      constructor() {
-        this._defaultBundleIdentifierOptions = {
-          connector: "-",
-          createBundleAssetId: (bundleId, assetId) => `${bundleId}${this._bundleIdConnector}${assetId}`,
-          extractAssetIdFromBundle: (bundleId, assetBundleId) => assetBundleId.replace(`${bundleId}${this._bundleIdConnector}`, "")
-        };
-        /** The character that is used to connect the bundleId and the assetId when generating a bundle asset id key */
-        this._bundleIdConnector = this._defaultBundleIdentifierOptions.connector;
-        /**
-         * A function that generates a bundle asset id key from a bundleId and an assetId
-         * @param bundleId - the bundleId
-         * @param assetId  - the assetId
-         * @returns the bundle asset id key
-         */
-        this._createBundleAssetId = this._defaultBundleIdentifierOptions.createBundleAssetId;
-        /**
-         * A function that generates an assetId from a bundle asset id key. This is the reverse of generateBundleAssetId
-         * @param bundleId - the bundleId
-         * @param assetBundleId - the bundle asset id key
-         * @returns the assetId
-         */
-        this._extractAssetIdFromBundle = this._defaultBundleIdentifierOptions.extractAssetIdFromBundle;
-        this._assetMap = {};
-        this._preferredOrder = [];
-        this._parsers = [];
-        this._resolverHash = {};
-        this._bundles = {};
-      }
-      /**
-       * Override how the resolver deals with generating bundle ids.
-       * must be called before any bundles are added
-       * @param bundleIdentifier - the bundle identifier options
-       */
-      setBundleIdentifier(bundleIdentifier) {
-        var _a, _b, _c;
-        this._bundleIdConnector = (_a = bundleIdentifier.connector) != null ? _a : this._bundleIdConnector;
-        this._createBundleAssetId = (_b = bundleIdentifier.createBundleAssetId) != null ? _b : this._createBundleAssetId;
-        this._extractAssetIdFromBundle = (_c = bundleIdentifier.extractAssetIdFromBundle) != null ? _c : this._extractAssetIdFromBundle;
-        if (this._extractAssetIdFromBundle("foo", this._createBundleAssetId("foo", "bar")) !== "bar") {
-          throw new Error("[Resolver] GenerateBundleAssetId are not working correctly");
-        }
-      }
-      /**
-       * Let the resolver know which assets you prefer to use when resolving assets.
-       * Multiple prefer user defined rules can be added.
-       * @example
-       * resolver.prefer({
-       *     // first look for something with the correct format, and then then correct resolution
-       *     priority: ['format', 'resolution'],
-       *     params:{
-       *         format:'webp', // prefer webp images
-       *         resolution: 2, // prefer a resolution of 2
-       *     }
-       * })
-       * resolver.add('foo', ['bar@2x.webp', 'bar@2x.png', 'bar.webp', 'bar.png']);
-       * resolver.resolveUrl('foo') // => 'bar@2x.webp'
-       * @param preferOrders - the prefer options
-       */
-      prefer(...preferOrders) {
-        preferOrders.forEach((prefer) => {
-          this._preferredOrder.push(prefer);
-          if (!prefer.priority) {
-            prefer.priority = Object.keys(prefer.params);
-          }
-        });
-        this._resolverHash = {};
-      }
-      /**
-       * Set the base path to prepend to all urls when resolving
-       * @example
-       * resolver.basePath = 'https://home.com/';
-       * resolver.add('foo', 'bar.ong');
-       * resolver.resolveUrl('foo', 'bar.png'); // => 'https://home.com/bar.png'
-       * @param basePath - the base path to use
-       */
-      set basePath(basePath) {
-        this._basePath = basePath;
-      }
-      get basePath() {
-        return this._basePath;
-      }
-      /**
-       * Set the root path for root-relative URLs. By default the `basePath`'s root is used. If no `basePath` is set, then the
-       * default value for browsers is `window.location.origin`
-       * @example
-       * // Application hosted on https://home.com/some-path/index.html
-       * resolver.basePath = 'https://home.com/some-path/';
-       * resolver.rootPath = 'https://home.com/';
-       * resolver.add('foo', '/bar.png');
-       * resolver.resolveUrl('foo', '/bar.png'); // => 'https://home.com/bar.png'
-       * @param rootPath - the root path to use
-       */
-      set rootPath(rootPath) {
-        this._rootPath = rootPath;
-      }
-      get rootPath() {
-        return this._rootPath;
-      }
-      /**
-       * All the active URL parsers that help the parser to extract information and create
-       * an asset object-based on parsing the URL itself.
-       *
-       * Can be added using the extensions API
-       * @example
-       * resolver.add('foo', [
-       *     {
-       *         resolution: 2,
-       *         format: 'png',
-       *         src: 'image@2x.png',
-       *     },
-       *     {
-       *         resolution:1,
-       *         format:'png',
-       *         src: 'image.png',
-       *     },
-       * ]);
-       *
-       * // With a url parser the information such as resolution and file format could extracted from the url itself:
-       * extensions.add({
-       *     extension: ExtensionType.ResolveParser,
-       *     test: loadTextures.test, // test if url ends in an image
-       *     parse: (value: string) =>
-       *     ({
-       *         resolution: parseFloat(Resolver.RETINA_PREFIX.exec(value)?.[1] ?? '1'),
-       *         format: value.split('.').pop(),
-       *         src: value,
-       *     }),
-       * });
-       *
-       * // Now resolution and format can be extracted from the url
-       * resolver.add('foo', [
-       *     'image@2x.png',
-       *     'image.png',
-       * ]);
-       */
-      get parsers() {
-        return this._parsers;
-      }
-      /** Used for testing, this resets the resolver to its initial state */
-      reset() {
-        this.setBundleIdentifier(this._defaultBundleIdentifierOptions);
-        this._assetMap = {};
-        this._preferredOrder = [];
-        this._resolverHash = {};
-        this._rootPath = null;
-        this._basePath = null;
-        this._manifest = null;
-        this._bundles = {};
-        this._defaultSearchParams = null;
-      }
-      /**
-       * Sets the default URL search parameters for the URL resolver. The urls can be specified as a string or an object.
-       * @param searchParams - the default url parameters to append when resolving urls
-       */
-      setDefaultSearchParams(searchParams) {
-        if (typeof searchParams === "string") {
-          this._defaultSearchParams = searchParams;
-        } else {
-          const queryValues = searchParams;
-          this._defaultSearchParams = Object.keys(queryValues).map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(queryValues[key])}`).join("&");
-        }
-      }
-      /**
-       * Returns the aliases for a given asset
-       * @param asset - the asset to get the aliases for
-       */
-      getAlias(asset) {
-        const { alias, src } = asset;
-        const aliasesToUse = convertToList(
-          alias || src,
-          (value) => {
-            if (typeof value === "string")
-              return value;
-            if (Array.isArray(value))
-              return value.map((v) => {
-                var _a;
-                return (_a = v == null ? void 0 : v.src) != null ? _a : v;
-              });
-            if (value == null ? void 0 : value.src)
-              return value.src;
-            return value;
-          },
-          true
-        );
-        return aliasesToUse;
-      }
-      /**
-       * Add a manifest to the asset resolver. This is a nice way to add all the asset information in one go.
-       * generally a manifest would be built using a tool.
-       * @param manifest - the manifest to add to the resolver
-       */
-      addManifest(manifest) {
-        if (this._manifest) {
-          warn("[Resolver] Manifest already exists, this will be overwritten");
-        }
-        this._manifest = manifest;
-        manifest.bundles.forEach((bundle) => {
-          this.addBundle(bundle.name, bundle.assets);
-        });
-      }
-      /**
-       * This adds a bundle of assets in one go so that you can resolve them as a group.
-       * For example you could add a bundle for each screen in you pixi app
-       * @example
-       * resolver.addBundle('animals', {
-       *     bunny: 'bunny.png',
-       *     chicken: 'chicken.png',
-       *     thumper: 'thumper.png',
-       * });
-       *
-       * const resolvedAssets = await resolver.resolveBundle('animals');
-       * @param bundleId - The id of the bundle to add
-       * @param assets - A record of the asset or assets that will be chosen from when loading via the specified key
-       */
-      addBundle(bundleId, assets) {
-        const assetNames = [];
-        assets.forEach((asset) => {
-          const srcs = asset.src;
-          const aliases = asset.alias;
-          let ids;
-          if (typeof aliases === "string") {
-            const bundleAssetId = this._createBundleAssetId(bundleId, aliases);
-            assetNames.push(bundleAssetId);
-            ids = [aliases, bundleAssetId];
-          } else {
-            const bundleIds = aliases.map((name) => this._createBundleAssetId(bundleId, name));
-            assetNames.push(...bundleIds);
-            ids = [...aliases, ...bundleIds];
-          }
-          this.add(__spreadValues$T(__spreadValues$T({}, asset), {
-            alias: ids,
-            src: srcs
-          }));
-        });
-        this._bundles[bundleId] = assetNames;
-      }
-      /**
-       * Tells the resolver what keys are associated with witch asset.
-       * The most important thing the resolver does
-       * @example
-       * // Single key, single asset:
-       * resolver.add({alias: 'foo', src: 'bar.png');
-       * resolver.resolveUrl('foo') // => 'bar.png'
-       *
-       * // Multiple keys, single asset:
-       * resolver.add({alias: ['foo', 'boo'], src: 'bar.png'});
-       * resolver.resolveUrl('foo') // => 'bar.png'
-       * resolver.resolveUrl('boo') // => 'bar.png'
-       *
-       * // Multiple keys, multiple assets:
-       * resolver.add({alias: ['foo', 'boo'], src: ['bar.png', 'bar.webp']});
-       * resolver.resolveUrl('foo') // => 'bar.png'
-       *
-       * // Add custom data attached to the resolver
-       * Resolver.add({
-       *     alias: 'bunnyBooBooSmooth',
-       *     src: 'bunny{png,webp}',
-       *     data: { scaleMode:SCALE_MODES.NEAREST }, // Base texture options
-       * });
-       *
-       * resolver.resolve('bunnyBooBooSmooth') // => { src: 'bunny.png', data: { scaleMode: SCALE_MODES.NEAREST } }
-       * @param aliases - the UnresolvedAsset or array of UnresolvedAssets to add to the resolver
-       */
-      add(aliases) {
-        const assets = [];
-        if (Array.isArray(aliases)) {
-          assets.push(...aliases);
-        } else {
-          assets.push(aliases);
-        }
-        let keyCheck;
-        keyCheck = (key) => {
-          if (this.hasKey(key)) {
-            warn(`[Resolver] already has key: ${key} overwriting`);
-          }
-        };
-        const assetArray = convertToList(assets);
-        assetArray.forEach((asset) => {
-          const { src } = asset;
-          let { data, format, loadParser } = asset;
-          const srcsToUse = convertToList(src).map((src2) => {
-            if (typeof src2 === "string") {
-              return createStringVariations(src2);
-            }
-            return Array.isArray(src2) ? src2 : [src2];
-          });
-          const aliasesToUse = this.getAlias(asset);
-          Array.isArray(aliasesToUse) ? aliasesToUse.forEach(keyCheck) : keyCheck(aliasesToUse);
-          const resolvedAssets = [];
-          srcsToUse.forEach((srcs) => {
-            srcs.forEach((src2) => {
-              var _a, _b, _c;
-              let formattedAsset = {};
-              if (typeof src2 !== "object") {
-                formattedAsset.src = src2;
-                for (let i = 0; i < this._parsers.length; i++) {
-                  const parser = this._parsers[i];
-                  if (parser.test(src2)) {
-                    formattedAsset = parser.parse(src2);
-                    break;
-                  }
-                }
-              } else {
-                data = (_a = src2.data) != null ? _a : data;
-                format = (_b = src2.format) != null ? _b : format;
-                loadParser = (_c = src2.loadParser) != null ? _c : loadParser;
-                formattedAsset = __spreadValues$T(__spreadValues$T({}, formattedAsset), src2);
-              }
-              if (!aliasesToUse) {
-                throw new Error(`[Resolver] alias is undefined for this asset: ${formattedAsset.src}`);
-              }
-              formattedAsset = this._buildResolvedAsset(formattedAsset, {
-                aliases: aliasesToUse,
-                data,
-                format,
-                loadParser
-              });
-              resolvedAssets.push(formattedAsset);
-            });
-          });
-          aliasesToUse.forEach((alias) => {
-            this._assetMap[alias] = resolvedAssets;
-          });
-        });
-      }
-      // TODO: this needs an overload like load did in Assets
-      /**
-       * If the resolver has had a manifest set via setManifest, this will return the assets urls for
-       * a given bundleId or bundleIds.
-       * @example
-       * // Manifest Example
-       * const manifest = {
-       *     bundles: [
-       *         {
-       *             name: 'load-screen',
-       *             assets: [
-       *                 {
-       *                     alias: 'background',
-       *                     src: 'sunset.png',
-       *                 },
-       *                 {
-       *                     alias: 'bar',
-       *                     src: 'load-bar.{png,webp}',
-       *                 },
-       *             ],
-       *         },
-       *         {
-       *             name: 'game-screen',
-       *             assets: [
-       *                 {
-       *                     alias: 'character',
-       *                     src: 'robot.png',
-       *                 },
-       *                 {
-       *                     alias: 'enemy',
-       *                     src: 'bad-guy.png',
-       *                 },
-       *             ],
-       *         },
-       *     ]
-       * };
-       *
-       * resolver.setManifest(manifest);
-       * const resolved = resolver.resolveBundle('load-screen');
-       * @param bundleIds - The bundle ids to resolve
-       * @returns All the bundles assets or a hash of assets for each bundle specified
-       */
-      resolveBundle(bundleIds) {
-        const singleAsset = isSingleItem(bundleIds);
-        bundleIds = convertToList(bundleIds);
-        const out = {};
-        bundleIds.forEach((bundleId) => {
-          const assetNames = this._bundles[bundleId];
-          if (assetNames) {
-            const results = this.resolve(assetNames);
-            const assets = {};
-            for (const key in results) {
-              const asset = results[key];
-              assets[this._extractAssetIdFromBundle(bundleId, key)] = asset;
-            }
-            out[bundleId] = assets;
-          }
-        });
-        return singleAsset ? out[bundleIds[0]] : out;
-      }
-      /**
-       * Does exactly what resolve does, but returns just the URL rather than the whole asset object
-       * @param key - The key or keys to resolve
-       * @returns - The URLs associated with the key(s)
-       */
-      resolveUrl(key) {
-        const result = this.resolve(key);
-        if (typeof key !== "string") {
-          const out = {};
-          for (const i in result) {
-            out[i] = result[i].src;
-          }
-          return out;
-        }
-        return result.src;
-      }
-      resolve(keys) {
-        const singleAsset = isSingleItem(keys);
-        keys = convertToList(keys);
-        const result = {};
-        keys.forEach((key) => {
-          if (!this._resolverHash[key]) {
-            if (this._assetMap[key]) {
-              let assets = this._assetMap[key];
-              const preferredOrder = this._getPreferredOrder(assets);
-              preferredOrder == null ? void 0 : preferredOrder.priority.forEach((priorityKey) => {
-                preferredOrder.params[priorityKey].forEach((value) => {
-                  const filteredAssets = assets.filter((asset) => {
-                    if (asset[priorityKey]) {
-                      return asset[priorityKey] === value;
-                    }
-                    return false;
-                  });
-                  if (filteredAssets.length) {
-                    assets = filteredAssets;
-                  }
-                });
-              });
-              this._resolverHash[key] = assets[0];
-            } else {
-              this._resolverHash[key] = this._buildResolvedAsset({
-                alias: [key],
-                src: key
-              }, {});
-            }
-          }
-          result[key] = this._resolverHash[key];
-        });
-        return singleAsset ? result[keys[0]] : result;
-      }
-      /**
-       * Checks if an asset with a given key exists in the resolver
-       * @param key - The key of the asset
-       */
-      hasKey(key) {
-        return !!this._assetMap[key];
-      }
-      /**
-       * Checks if a bundle with the given key exists in the resolver
-       * @param key - The key of the bundle
-       */
-      hasBundle(key) {
-        return !!this._bundles[key];
-      }
-      /**
-       * Internal function for figuring out what prefer criteria an asset should use.
-       * @param assets
-       */
-      _getPreferredOrder(assets) {
-        for (let i = 0; i < assets.length; i++) {
-          const asset = assets[0];
-          const preferred = this._preferredOrder.find((preference) => preference.params.format.includes(asset.format));
-          if (preferred) {
-            return preferred;
-          }
-        }
-        return this._preferredOrder[0];
-      }
-      /**
-       * Appends the default url parameters to the url
-       * @param url - The url to append the default parameters to
-       * @returns - The url with the default parameters appended
-       */
-      _appendDefaultSearchParams(url) {
-        if (!this._defaultSearchParams)
-          return url;
-        const paramConnector = /\?/.test(url) ? "&" : "?";
-        return `${url}${paramConnector}${this._defaultSearchParams}`;
-      }
-      _buildResolvedAsset(formattedAsset, data) {
-        var _a, _b;
-        const { aliases, data: assetData, loadParser, format } = data;
-        if (this._basePath || this._rootPath) {
-          formattedAsset.src = path.toAbsolute(formattedAsset.src, this._basePath, this._rootPath);
-        }
-        formattedAsset.alias = (_a = aliases != null ? aliases : formattedAsset.alias) != null ? _a : [formattedAsset.src];
-        formattedAsset.src = this._appendDefaultSearchParams(formattedAsset.src);
-        formattedAsset.data = __spreadValues$T(__spreadValues$T({}, assetData || {}), formattedAsset.data);
-        formattedAsset.loadParser = loadParser != null ? loadParser : formattedAsset.loadParser;
-        formattedAsset.format = (_b = format != null ? format : formattedAsset.format) != null ? _b : getUrlExtension(formattedAsset.src);
-        return formattedAsset;
-      }
-    }
-    /**
-     * The prefix that denotes a URL is for a retina asset.
-     * @static
-     * @name RETINA_PREFIX
-     * @type {RegExp}
-     * @default /@([0-9\.]+)x/
-     * @example `@2x`
-     */
-    Resolver.RETINA_PREFIX = /@([0-9\.]+)x/;
-    function getUrlExtension(url) {
-      return url.split(".").pop().split("?").shift().split("#").shift();
-    }
-
-    "use strict";
-    const copySearchParams = (targetUrl, sourceUrl) => {
-      const searchParams = sourceUrl.split("?")[1];
-      if (searchParams) {
-        targetUrl += `?${searchParams}`;
-      }
-      return targetUrl;
-    };
-
-    "use strict";
-    class CacheClass {
-      constructor() {
-        this._parsers = [];
-        this._cache = /* @__PURE__ */ new Map();
-        this._cacheMap = /* @__PURE__ */ new Map();
-      }
-      /** Clear all entries. */
-      reset() {
-        this._cacheMap.clear();
-        this._cache.clear();
-      }
-      /**
-       * Check if the key exists
-       * @param key - The key to check
-       */
-      has(key) {
-        return this._cache.has(key);
-      }
-      /**
-       * Fetch entry by key
-       * @param key - The key of the entry to get
-       */
-      get(key) {
-        const result = this._cache.get(key);
-        if (!result) {
-          warn(`[Assets] Asset id ${key} was not found in the Cache`);
-        }
-        return result;
-      }
-      /**
-       * Set a value by key or keys name
-       * @param key - The key or keys to set
-       * @param value - The value to store in the cache or from which cacheable assets will be derived.
-       */
-      set(key, value) {
-        const keys = convertToList(key);
-        let cacheableAssets;
-        for (let i = 0; i < this.parsers.length; i++) {
-          const parser = this.parsers[i];
-          if (parser.test(value)) {
-            cacheableAssets = parser.getCacheableAssets(keys, value);
-            break;
-          }
-        }
-        const cacheableMap = new Map(Object.entries(cacheableAssets || {}));
-        if (!cacheableAssets) {
-          keys.forEach((key2) => {
-            cacheableMap.set(key2, value);
-          });
-        }
-        const cacheKeys = [...cacheableMap.keys()];
-        const cachedAssets = {
-          cacheKeys,
-          keys
-        };
-        keys.forEach((key2) => {
-          this._cacheMap.set(key2, cachedAssets);
-        });
-        cacheKeys.forEach((key2) => {
-          const val = cacheableAssets ? cacheableAssets[key2] : value;
-          if (this._cache.has(key2) && this._cache.get(key2) !== val) {
-            warn("[Cache] already has key:", key2);
-          }
-          this._cache.set(key2, cacheableMap.get(key2));
-        });
-      }
-      /**
-       * Remove entry by key
-       *
-       * This function will also remove any associated alias from the cache also.
-       * @param key - The key of the entry to remove
-       */
-      remove(key) {
-        if (!this._cacheMap.has(key)) {
-          warn(`[Assets] Asset id ${key} was not found in the Cache`);
-          return;
-        }
-        const cacheMap = this._cacheMap.get(key);
-        const cacheKeys = cacheMap.cacheKeys;
-        cacheKeys.forEach((key2) => {
-          this._cache.delete(key2);
-        });
-        cacheMap.keys.forEach((key2) => {
-          this._cacheMap.delete(key2);
-        });
-      }
-      /** All loader parsers registered */
-      get parsers() {
-        return this._parsers;
-      }
-    }
-    const Cache = new CacheClass();
-
-    "use strict";
-    const ux = [1, 1, 0, -1, -1, -1, 0, 1, 1, 1, 0, -1, -1, -1, 0, 1];
-    const uy = [0, 1, 1, 1, 0, -1, -1, -1, 0, 1, 1, 1, 0, -1, -1, -1];
-    const vx = [0, -1, -1, -1, 0, 1, 1, 1, 0, 1, 1, 1, 0, -1, -1, -1];
-    const vy = [1, 1, 0, -1, -1, -1, 0, 1, -1, -1, 0, 1, 1, 1, 0, -1];
-    const rotationCayley = [];
-    const rotationMatrices = [];
-    const signum = Math.sign;
-    function init() {
-      for (let i = 0; i < 16; i++) {
-        const row = [];
-        rotationCayley.push(row);
-        for (let j = 0; j < 16; j++) {
-          const _ux = signum(ux[i] * ux[j] + vx[i] * uy[j]);
-          const _uy = signum(uy[i] * ux[j] + vy[i] * uy[j]);
-          const _vx = signum(ux[i] * vx[j] + vx[i] * vy[j]);
-          const _vy = signum(uy[i] * vx[j] + vy[i] * vy[j]);
-          for (let k = 0; k < 16; k++) {
-            if (ux[k] === _ux && uy[k] === _uy && vx[k] === _vx && vy[k] === _vy) {
-              row.push(k);
-              break;
-            }
-          }
-        }
-      }
-      for (let i = 0; i < 16; i++) {
-        const mat = new Matrix();
-        mat.set(ux[i], uy[i], vx[i], vy[i], 0, 0);
-        rotationMatrices.push(mat);
-      }
-    }
-    init();
-    const groupD8 = {
-      /**
-       * | Rotation | Direction |
-       * |----------|-----------|
-       * | 0°       | East      |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      E: 0,
-      /**
-       * | Rotation | Direction |
-       * |----------|-----------|
-       * | 45°↻     | Southeast |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      SE: 1,
-      /**
-       * | Rotation | Direction |
-       * |----------|-----------|
-       * | 90°↻     | South     |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      S: 2,
-      /**
-       * | Rotation | Direction |
-       * |----------|-----------|
-       * | 135°↻    | Southwest |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      SW: 3,
-      /**
-       * | Rotation | Direction |
-       * |----------|-----------|
-       * | 180°     | West      |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      W: 4,
-      /**
-       * | Rotation    | Direction    |
-       * |-------------|--------------|
-       * | -135°/225°↻ | Northwest    |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      NW: 5,
-      /**
-       * | Rotation    | Direction    |
-       * |-------------|--------------|
-       * | -90°/270°↻  | North        |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      N: 6,
-      /**
-       * | Rotation    | Direction    |
-       * |-------------|--------------|
-       * | -45°/315°↻  | Northeast    |
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      NE: 7,
-      /**
-       * Reflection about Y-axis.
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      MIRROR_VERTICAL: 8,
-      /**
-       * Reflection about the main diagonal.
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      MAIN_DIAGONAL: 10,
-      /**
-       * Reflection about X-axis.
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      MIRROR_HORIZONTAL: 12,
-      /**
-       * Reflection about reverse diagonal.
-       * @memberof maths.groupD8
-       * @constant {GD8Symmetry}
-       */
-      REVERSE_DIAGONAL: 14,
-      /**
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} ind - sprite rotation angle.
-       * @returns {GD8Symmetry} The X-component of the U-axis
-       *    after rotating the axes.
-       */
-      uX: (ind) => ux[ind],
-      /**
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} ind - sprite rotation angle.
-       * @returns {GD8Symmetry} The Y-component of the U-axis
-       *    after rotating the axes.
-       */
-      uY: (ind) => uy[ind],
-      /**
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} ind - sprite rotation angle.
-       * @returns {GD8Symmetry} The X-component of the V-axis
-       *    after rotating the axes.
-       */
-      vX: (ind) => vx[ind],
-      /**
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} ind - sprite rotation angle.
-       * @returns {GD8Symmetry} The Y-component of the V-axis
-       *    after rotating the axes.
-       */
-      vY: (ind) => vy[ind],
-      /**
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} rotation - symmetry whose opposite
-       *   is needed. Only rotations have opposite symmetries while
-       *   reflections don't.
-       * @returns {GD8Symmetry} The opposite symmetry of `rotation`
-       */
-      inv: (rotation) => {
-        if (rotation & 8) {
-          return rotation & 15;
-        }
-        return -rotation & 7;
-      },
-      /**
-       * Composes the two D8 operations.
-       *
-       * Taking `^` as reflection:
-       *
-       * |       | E=0 | S=2 | W=4 | N=6 | E^=8 | S^=10 | W^=12 | N^=14 |
-       * |-------|-----|-----|-----|-----|------|-------|-------|-------|
-       * | E=0   | E   | S   | W   | N   | E^   | S^    | W^    | N^    |
-       * | S=2   | S   | W   | N   | E   | S^   | W^    | N^    | E^    |
-       * | W=4   | W   | N   | E   | S   | W^   | N^    | E^    | S^    |
-       * | N=6   | N   | E   | S   | W   | N^   | E^    | S^    | W^    |
-       * | E^=8  | E^  | N^  | W^  | S^  | E    | N     | W     | S     |
-       * | S^=10 | S^  | E^  | N^  | W^  | S    | E     | N     | W     |
-       * | W^=12 | W^  | S^  | E^  | N^  | W    | S     | E     | N     |
-       * | N^=14 | N^  | W^  | S^  | E^  | N    | W     | S     | E     |
-       *
-       * [This is a Cayley table]{@link https://en.wikipedia.org/wiki/Cayley_table}
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} rotationSecond - Second operation, which
-       *   is the row in the above cayley table.
-       * @param {GD8Symmetry} rotationFirst - First operation, which
-       *   is the column in the above cayley table.
-       * @returns {GD8Symmetry} Composed operation
-       */
-      add: (rotationSecond, rotationFirst) => rotationCayley[rotationSecond][rotationFirst],
-      /**
-       * Reverse of `add`.
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} rotationSecond - Second operation
-       * @param {GD8Symmetry} rotationFirst - First operation
-       * @returns {GD8Symmetry} Result
-       */
-      sub: (rotationSecond, rotationFirst) => rotationCayley[rotationSecond][groupD8.inv(rotationFirst)],
-      /**
-       * Adds 180 degrees to rotation, which is a commutative
-       * operation.
-       * @memberof maths.groupD8
-       * @param {number} rotation - The number to rotate.
-       * @returns {number} Rotated number
-       */
-      rotate180: (rotation) => rotation ^ 4,
-      /**
-       * Checks if the rotation angle is vertical, i.e. south
-       * or north. It doesn't work for reflections.
-       * @memberof maths.groupD8
-       * @param {GD8Symmetry} rotation - The number to check.
-       * @returns {boolean} Whether or not the direction is vertical
-       */
-      isVertical: (rotation) => (rotation & 3) === 2,
-      // rotation % 4 === 2
-      /**
-       * Approximates the vector `V(dx,dy)` into one of the
-       * eight directions provided by `groupD8`.
-       * @memberof maths.groupD8
-       * @param {number} dx - X-component of the vector
-       * @param {number} dy - Y-component of the vector
-       * @returns {GD8Symmetry} Approximation of the vector into
-       *  one of the eight symmetries.
-       */
-      byDirection: (dx, dy) => {
-        if (Math.abs(dx) * 2 <= Math.abs(dy)) {
-          if (dy >= 0) {
-            return groupD8.S;
-          }
-          return groupD8.N;
-        } else if (Math.abs(dy) * 2 <= Math.abs(dx)) {
-          if (dx > 0) {
-            return groupD8.E;
-          }
-          return groupD8.W;
-        } else if (dy > 0) {
-          if (dx > 0) {
-            return groupD8.SE;
-          }
-          return groupD8.SW;
-        } else if (dx > 0) {
-          return groupD8.NE;
-        }
-        return groupD8.NW;
-      },
-      /**
-       * Helps sprite to compensate texture packer rotation.
-       * @memberof maths.groupD8
-       * @param {Matrix} matrix - sprite world matrix
-       * @param {GD8Symmetry} rotation - The rotation factor to use.
-       * @param {number} tx - sprite anchoring
-       * @param {number} ty - sprite anchoring
-       */
-      matrixAppendRotationInv: (matrix, rotation, tx = 0, ty = 0) => {
-        const mat = rotationMatrices[groupD8.inv(rotation)];
-        mat.tx = tx;
-        mat.ty = ty;
-        matrix.append(mat);
-      }
-    };
-
-    "use strict";
-    const NOOP = () => {
-    };
-
-    "use strict";
-    function nextPow2(v) {
-      v += v === 0 ? 1 : 0;
-      --v;
-      v |= v >>> 1;
-      v |= v >>> 2;
-      v |= v >>> 4;
-      v |= v >>> 8;
-      v |= v >>> 16;
-      return v + 1;
-    }
-    function isPow2(v) {
-      return !(v & v - 1) && !!v;
-    }
-    function log2(v) {
-      let r = (v > 65535 ? 1 : 0) << 4;
-      v >>>= r;
-      let shift = (v > 255 ? 1 : 0) << 3;
-      v >>>= shift;
-      r |= shift;
-      shift = (v > 15 ? 1 : 0) << 2;
-      v >>>= shift;
-      r |= shift;
-      shift = (v > 3 ? 1 : 0) << 1;
-      v >>>= shift;
-      r |= shift;
-      return r | v >> 1;
-    }
-
-    "use strict";
-    function definedProps(obj) {
-      const result = {};
-      for (const key in obj) {
-        if (obj[key] !== void 0) {
-          result[key] = obj[key];
-        }
-      }
-      return result;
-    }
-
-    "use strict";
-    const idCounts = /* @__PURE__ */ Object.create(null);
-    const idHash = /* @__PURE__ */ Object.create(null);
-    function createIdFromString(value, groupId) {
-      let id = idHash[value];
-      if (id === void 0) {
-        if (idCounts[groupId] === void 0) {
-          idCounts[groupId] = 1;
-        }
-        idHash[value] = id = idCounts[groupId]++;
-      }
-      return id;
-    }
-
-    "use strict";
-    var __defProp$S = Object.defineProperty;
-    var __getOwnPropSymbols$S = Object.getOwnPropertySymbols;
-    var __hasOwnProp$S = Object.prototype.hasOwnProperty;
-    var __propIsEnum$S = Object.prototype.propertyIsEnumerable;
-    var __defNormalProp$S = (obj, key, value) => key in obj ? __defProp$S(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-    var __spreadValues$S = (a, b) => {
-      for (var prop in b || (b = {}))
-        if (__hasOwnProp$S.call(b, prop))
-          __defNormalProp$S(a, prop, b[prop]);
-      if (__getOwnPropSymbols$S)
-        for (var prop of __getOwnPropSymbols$S(b)) {
-          if (__propIsEnum$S.call(b, prop))
-            __defNormalProp$S(a, prop, b[prop]);
-        }
-      return a;
-    };
-    const _TextureStyle = class _TextureStyle extends EventEmitter {
-      constructor(options = {}) {
-        var _a, _b, _c, _d, _e, _f, _g;
-        super();
-        this._resourceType = "textureSampler";
-        this._touched = 0;
-        /**
-         * Specifies the maximum anisotropy value clamp used by the sampler.
-         * Note: Most implementations support {@link GPUSamplerDescriptor#maxAnisotropy} values in range
-         * between 1 and 16, inclusive. The used value of {@link GPUSamplerDescriptor#maxAnisotropy} will
-         * be clamped to the maximum value that the platform supports.
-         * @internal
-         */
-        this._maxAnisotropy = 1;
-        options = __spreadValues$S(__spreadValues$S({}, _TextureStyle.defaultOptions), options);
-        this.addressMode = options.addressMode;
-        this.addressModeU = (_a = options.addressModeU) != null ? _a : this.addressModeU;
-        this.addressModeV = (_b = options.addressModeV) != null ? _b : this.addressModeV;
-        this.addressModeW = (_c = options.addressModeW) != null ? _c : this.addressModeW;
-        this.scaleMode = options.scaleMode;
-        this.magFilter = (_d = options.magFilter) != null ? _d : this.magFilter;
-        this.minFilter = (_e = options.minFilter) != null ? _e : this.minFilter;
-        this.mipmapFilter = (_f = options.mipmapFilter) != null ? _f : this.mipmapFilter;
-        this.lodMinClamp = options.lodMinClamp;
-        this.lodMaxClamp = options.lodMaxClamp;
-        this.compare = options.compare;
-        this.maxAnisotropy = (_g = options.maxAnisotropy) != null ? _g : 1;
-      }
-      set addressMode(value) {
-        this.addressModeU = value;
-        this.addressModeV = value;
-        this.addressModeW = value;
-      }
-      get addressMode() {
-        return this.addressModeU;
-      }
-      set wrapMode(value) {
-        deprecation("8", "TextureStyle.wrapMode is now TextureStyle.addressMode");
-        this.addressMode = value;
-      }
-      get wrapMode() {
-        return this.addressMode;
-      }
-      set scaleMode(value) {
-        this.magFilter = value;
-        this.minFilter = value;
-        this.mipmapFilter = value;
-      }
-      get scaleMode() {
-        return this.magFilter;
-      }
-      set maxAnisotropy(value) {
-        this._maxAnisotropy = Math.min(value, 16);
-        if (this._maxAnisotropy > 1) {
-          this.scaleMode = "linear";
-        }
-      }
-      get maxAnisotropy() {
-        return this._maxAnisotropy;
-      }
-      // TODO - move this to WebGL?
-      get _resourceId() {
-        return this._sharedResourceId || this._generateResourceId();
-      }
-      update() {
-        this.emit("change", this);
-        this._sharedResourceId = null;
-      }
-      _generateResourceId() {
-        const bigKey = `${this.addressModeU}-${this.addressModeV}-${this.addressModeW}-${this.magFilter}-${this.minFilter}-${this.mipmapFilter}-${this.lodMinClamp}-${this.lodMaxClamp}-${this.compare}-${this._maxAnisotropy}`;
-        this._sharedResourceId = createIdFromString(bigKey, "sampler");
-        return this._resourceId;
-      }
-      /** Destroys the style */
-      destroy() {
-        this.emit("destroy", this);
-        this.removeAllListeners();
-      }
-    };
-    // override to set styles globally
-    _TextureStyle.defaultOptions = {
-      addressMode: "clamp-to-edge",
-      scaleMode: "linear"
-    };
-    let TextureStyle = _TextureStyle;
-
-    "use strict";
-    var __defProp$R = Object.defineProperty;
-    var __getOwnPropSymbols$R = Object.getOwnPropertySymbols;
-    var __hasOwnProp$R = Object.prototype.hasOwnProperty;
-    var __propIsEnum$R = Object.prototype.propertyIsEnumerable;
-    var __defNormalProp$R = (obj, key, value) => key in obj ? __defProp$R(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-    var __spreadValues$R = (a, b) => {
-      for (var prop in b || (b = {}))
-        if (__hasOwnProp$R.call(b, prop))
-          __defNormalProp$R(a, prop, b[prop]);
-      if (__getOwnPropSymbols$R)
-        for (var prop of __getOwnPropSymbols$R(b)) {
-          if (__propIsEnum$R.call(b, prop))
-            __defNormalProp$R(a, prop, b[prop]);
-        }
-      return a;
-    };
-    const _TextureSource = class _TextureSource extends EventEmitter {
-      constructor(options = {}) {
-        var _a, _b, _c;
-        super();
-        this.options = options;
-        /** unique id for this Texture source */
-        this.uid = uid("textureSource");
-        /** optional label, can be used for debugging */
-        this.label = "";
-        /**
-         * The resource type used by this TextureSource. This is used by the bind groups to determine
-         * how to handle this resource.
-         * @ignore
-         * @internal
-         */
-        this._resourceType = "textureSource";
-        /**
-         * i unique resource id, used by the bind group systems.
-         * This can change if the texture is resized or its resource changes
-         */
-        this._resourceId = uid("textureResource");
-        /**
-         * this is how the backends know how to upload this texture to the GPU
-         * It changes depending on the resource type. Classes that extend TextureSource
-         * should override this property.
-         * @ignore
-         * @internal
-         */
-        this.uploadMethodId = "unknown";
-        // dimensions
-        /** @internal */
-        this._resolution = 1;
-        /** the pixel width of this texture source. This is the REAL pure number, not accounting resolution */
-        this.pixelWidth = 1;
-        /** the pixel height of this texture source. This is the REAL pure number, not accounting resolution */
-        this.pixelHeight = 1;
-        /**
-         * the width of this texture source, accounting for resolution
-         * eg pixelWidth 200, resolution 2, then width will be 100
-         */
-        this.width = 1;
-        /**
-         * the height of this texture source, accounting for resolution
-         * eg pixelHeight 200, resolution 2, then height will be 100
-         */
-        this.height = 1;
-        /**
-         * The number of samples of a multisample texture. This is always 1 for non-multisample textures.
-         * To enable multisample for a texture, set antialias to true
-         * @internal
-         * @ignore
-         */
-        this.sampleCount = 1;
-        /** The number of mip levels to generate for this texture. this is  overridden if autoGenerateMipmaps is true */
-        this.mipLevelCount = 1;
-        /**
-         * Should we auto generate mipmaps for this texture? This will automatically generate mipmaps
-         * for this texture when uploading to the GPU. Mipmapped textures take up more memory, but
-         * can look better when scaled down.
-         *
-         * For performance reasons, it is recommended to NOT use this with RenderTextures, as they are often updated every frame.
-         * If you do, make sure to call `updateMipmaps` after you update the texture.
-         */
-        this.autoGenerateMipmaps = false;
-        /** the format that the texture data has */
-        this.format = "rgba8unorm";
-        /** how many dimensions does this texture have? currently v8 only supports 2d */
-        this.dimension = "2d";
-        /**
-         * Only really affects RenderTextures.
-         * Should we use antialiasing for this texture. It will look better, but may impact performance as a
-         * Blit operation will be required to resolve the texture.
-         */
-        this.antialias = false;
-        /** Should we use a depth stencil texture for this texture. This is only used when rendering to a texture. */
-        this.depthStencil = true;
-        /**
-         * Used by automatic texture Garbage Collection, stores last GC tick when it was bound
-         * @protected
-         */
-        this._touched = 0;
-        /**
-         * Used by the batcher to build texture batches. faster to have the variable here!
-         * @protected
-         */
-        this._batchTick = -1;
-        /**
-         * A temporary batch location for the texture batching. Here for performance reasons only!
-         * @protected
-         */
-        this._textureBindLocation = -1;
-        options = __spreadValues$R(__spreadValues$R({}, _TextureSource.defaultOptions), options);
-        (_a = this.label) != null ? _a : this.label = options.label;
-        this.resource = options.resource;
-        this._resolution = options.resolution;
-        if (options.width) {
-          this.pixelWidth = options.width * this._resolution;
-        } else {
-          this.pixelWidth = this.resource ? (_b = this.resourceWidth) != null ? _b : 1 : 1;
-        }
-        if (options.height) {
-          this.pixelHeight = options.height * this._resolution;
-        } else {
-          this.pixelHeight = this.resource ? (_c = this.resourceHeight) != null ? _c : 1 : 1;
-        }
-        this.width = this.pixelWidth / this._resolution;
-        this.height = this.pixelHeight / this._resolution;
-        this.format = options.format;
-        this.dimension = options.dimensions;
-        this.mipLevelCount = options.mipLevelCount;
-        this.autoGenerateMipmaps = options.autoGenerateMipmaps;
-        this.sampleCount = options.sampleCount;
-        this.antialias = options.antialias;
-        this.alphaMode = options.alphaMode;
-        this.style = new TextureStyle(definedProps(options));
-        this.destroyed = false;
-        this._refreshPOT();
-      }
-      /** returns itself */
-      get source() {
-        return this;
-      }
-      /** the style of the texture */
-      get style() {
-        return this._style;
-      }
-      set style(value) {
-        var _a, _b;
-        if (this.style === value)
-          return;
-        (_a = this._style) == null ? void 0 : _a.off("change", this._onStyleChange, this);
-        this._style = value;
-        (_b = this._style) == null ? void 0 : _b.on("change", this._onStyleChange, this);
-        this._onStyleChange();
-      }
-      get addressMode() {
-        return this._style.addressMode;
-      }
-      set addressMode(value) {
-        this._style.addressMode = value;
-      }
-      get repeatMode() {
-        return this._style.addressMode;
-      }
-      set repeatMode(value) {
-        this._style.addressMode = value;
-      }
-      get magFilter() {
-        return this._style.magFilter;
-      }
-      set magFilter(value) {
-        this._style.magFilter = value;
-      }
-      get minFilter() {
-        return this._style.minFilter;
-      }
-      set minFilter(value) {
-        this._style.minFilter = value;
-      }
-      get mipmapFilter() {
-        return this._style.mipmapFilter;
-      }
-      set mipmapFilter(value) {
-        this._style.mipmapFilter = value;
-      }
-      get lodMinClamp() {
-        return this._style.lodMinClamp;
-      }
-      set lodMinClamp(value) {
-        this._style.lodMinClamp = value;
-      }
-      get lodMaxClamp() {
-        return this._style.lodMaxClamp;
-      }
-      set lodMaxClamp(value) {
-        this._style.lodMaxClamp = value;
-      }
-      _onStyleChange() {
-        this.emit("styleChange", this);
-      }
-      /** call this if you have modified the texture outside of the constructor */
-      update() {
-        this.emit("update", this);
-      }
-      /** Destroys this texture source */
-      destroy() {
-        this.destroyed = true;
-        this.emit("destroy", this);
-        if (this._style) {
-          this._style.destroy();
-          this._style = null;
-        }
-        this.uploadMethodId = null;
-        this.resource = null;
-        this.removeAllListeners();
-      }
-      /**
-       * This will unload the Texture source from the GPU. This will free up the GPU memory
-       * As soon as it is required fore rendering, it will be re-uploaded.
-       */
-      unload() {
-        this._resourceId++;
-        this.emit("change", this);
-        this.emit("unload", this);
-      }
-      /** the width of the resource. This is the REAL pure number, not accounting resolution   */
-      get resourceWidth() {
-        const { resource } = this;
-        return resource.naturalWidth || resource.videoWidth || resource.displayWidth || resource.width;
-      }
-      /** the height of the resource. This is the REAL pure number, not accounting resolution */
-      get resourceHeight() {
-        const { resource } = this;
-        return resource.naturalHeight || resource.videoHeight || resource.displayHeight || resource.height;
-      }
-      /**
-       * the resolution of the texture. Changing this number, will not change the number of pixels in the actual texture
-       * but will the size of the texture when rendered.
-       *
-       * changing the resolution of this texture to 2 for example will make it appear twice as small when rendered (as pixel
-       * density will have increased)
-       */
-      get resolution() {
-        return this._resolution;
-      }
-      set resolution(resolution) {
-        if (this._resolution === resolution)
-          return;
-        this._resolution = resolution;
-        this.width = this.pixelWidth / resolution;
-        this.height = this.pixelHeight / resolution;
-      }
-      /**
-       * Resize the texture, this is handy if you want to use the texture as a render texture
-       * @param width - the new width of the texture
-       * @param height - the new height of the texture
-       * @param resolution - the new resolution of the texture
-       */
-      resize(width, height, resolution) {
-        resolution = resolution || this._resolution;
-        width = width || this.width;
-        height = height || this.height;
-        const newPixelWidth = Math.round(width * resolution);
-        const newPixelHeight = Math.round(height * resolution);
-        this.width = newPixelWidth / resolution;
-        this.height = newPixelHeight / resolution;
-        this._resolution = resolution;
-        if (this.pixelWidth === newPixelWidth && this.pixelHeight === newPixelHeight) {
-          return;
-        }
-        this._refreshPOT();
-        this.pixelWidth = newPixelWidth;
-        this.pixelHeight = newPixelHeight;
-        this.emit("resize", this);
-        this._resourceId++;
-        this.emit("change", this);
-      }
-      /**
-       * Lets the renderer know that this texture has been updated and its mipmaps should be re-generated.
-       * This is only important for RenderTexture instances, as standard Texture instances will have their
-       * mipmaps generated on upload. You should call this method after you make any change to the texture
-       *
-       * The reason for this is is can be quite expensive to update mipmaps for a texture. So by default,
-       * We want you, the developer to specify when this action should happen.
-       *
-       * Generally you don't want to have mipmaps generated on Render targets that are changed every frame,
-       */
-      updateMipmaps() {
-        if (this.autoGenerateMipmaps && this.mipLevelCount > 1) {
-          this.emit("updateMipmaps", this);
-        }
-      }
-      set wrapMode(value) {
-        this._style.wrapMode = value;
-      }
-      get wrapMode() {
-        return this._style.wrapMode;
-      }
-      set scaleMode(value) {
-        this._style.scaleMode = value;
-      }
-      get scaleMode() {
-        return this._style.scaleMode;
-      }
-      /**
-       * Refresh check for isPowerOfTwo texture based on size
-       * @private
-       */
-      _refreshPOT() {
-        this.isPowerOfTwo = isPow2(this.pixelWidth) && isPow2(this.pixelHeight);
-      }
-      static test(_resource) {
-        throw new Error("Unimplemented");
-      }
-    };
-    /** The default options used when creating a new TextureSource. override these to add your own defaults */
-    _TextureSource.defaultOptions = {
-      resolution: 1,
-      format: "bgra8unorm",
-      alphaMode: "premultiply-alpha-on-upload",
-      dimensions: "2d",
-      mipLevelCount: 1,
-      autoGenerateMipmaps: false,
-      sampleCount: 1,
-      antialias: false
-    };
-    let TextureSource = _TextureSource;
-
-    "use strict";
-    var __defProp$Q = Object.defineProperty;
-    var __defProps$h = Object.defineProperties;
-    var __getOwnPropDescs$h = Object.getOwnPropertyDescriptors;
-    var __getOwnPropSymbols$Q = Object.getOwnPropertySymbols;
-    var __hasOwnProp$Q = Object.prototype.hasOwnProperty;
-    var __propIsEnum$Q = Object.prototype.propertyIsEnumerable;
-    var __defNormalProp$Q = (obj, key, value) => key in obj ? __defProp$Q(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-    var __spreadValues$Q = (a, b) => {
-      for (var prop in b || (b = {}))
-        if (__hasOwnProp$Q.call(b, prop))
-          __defNormalProp$Q(a, prop, b[prop]);
-      if (__getOwnPropSymbols$Q)
-        for (var prop of __getOwnPropSymbols$Q(b)) {
-          if (__propIsEnum$Q.call(b, prop))
-            __defNormalProp$Q(a, prop, b[prop]);
-        }
-      return a;
-    };
-    var __spreadProps$h = (a, b) => __defProps$h(a, __getOwnPropDescs$h(b));
-    class BufferImageSource extends TextureSource {
-      constructor(options) {
-        const buffer = options.resource || new Float32Array(options.width * options.height * 4);
-        let format = options.format;
-        if (!format) {
-          if (buffer instanceof Float32Array) {
-            format = "rgba32float";
-          } else if (buffer instanceof Int32Array) {
-            format = "rgba32uint";
-          } else if (buffer instanceof Uint32Array) {
-            format = "rgba32uint";
-          } else if (buffer instanceof Int16Array) {
-            format = "rgba16uint";
-          } else if (buffer instanceof Uint16Array) {
-            format = "rgba16uint";
-          } else if (buffer instanceof Int8Array) {
-            format = "bgra8unorm";
-          } else {
-            format = "bgra8unorm";
-          }
-        }
-        super(__spreadProps$h(__spreadValues$Q({}, options), {
-          resource: buffer,
-          format
-        }));
-        this.uploadMethodId = "buffer";
-      }
-      static test(resource) {
-        return resource instanceof Int8Array || resource instanceof Uint8Array || resource instanceof Uint8ClampedArray || resource instanceof Int16Array || resource instanceof Uint16Array || resource instanceof Int32Array || resource instanceof Uint32Array || resource instanceof Float32Array;
-      }
-    }
-    BufferImageSource.extension = ExtensionType.TextureSource;
-
-    "use strict";
-    const sources = [];
-    extensions.handleByList(ExtensionType.TextureSource, sources);
-    function autoDetectSource(options = {}) {
-      for (let i = 0; i < sources.length; i++) {
-        const Source = sources[i];
-        if (Source.test(options.resource)) {
-          return new Source(options);
-        }
-      }
-      throw new Error(`Could not find a source type for resource: ${options.resource}`);
-    }
-    function resourceToTexture(options = {}, skipCache = false) {
-      const { resource } = options;
-      if (!skipCache && Cache.has(resource)) {
-        return Cache.get(resource);
-      }
-      const texture = new Texture({ source: autoDetectSource(options) });
-      texture.on("destroy", () => {
-        if (Cache.has(resource)) {
-          Cache.remove(resource);
-        }
-      });
-      if (!skipCache) {
-        Cache.set(resource, texture);
-      }
-      return texture;
-    }
-
-    "use strict";
-    const tempMat = new Matrix();
-    class TextureMatrix {
-      /**
-       * @param texture - observed texture
-       * @param clampMargin - Changes frame clamping, 0.5 by default. Use -0.5 for extra border.
-       */
-      constructor(texture, clampMargin) {
-        this.mapCoord = new Matrix();
-        this.uClampFrame = new Float32Array(4);
-        this.uClampOffset = new Float32Array(2);
-        this._textureID = -1;
-        this._updateID = 0;
-        this.clampOffset = 0;
-        if (typeof clampMargin === "undefined") {
-          this.clampMargin = texture.width < 10 ? 0 : 0.5;
-        } else {
-          this.clampMargin = clampMargin;
-        }
-        this.isSimple = false;
-        this.texture = texture;
-      }
-      /** Texture property. */
-      get texture() {
-        return this._texture;
-      }
-      set texture(value) {
-        var _a;
-        if (this.texture === value)
-          return;
-        (_a = this._texture) == null ? void 0 : _a.removeListener("update", this.update, this);
-        this._texture = value;
-        this._texture.addListener("update", this.update, this);
-        this.update();
-      }
-      /**
-       * Multiplies uvs array to transform
-       * @param uvs - mesh uvs
-       * @param [out=uvs] - output
-       * @returns - output
-       */
-      multiplyUvs(uvs, out) {
-        if (out === void 0) {
-          out = uvs;
-        }
-        const mat = this.mapCoord;
-        for (let i = 0; i < uvs.length; i += 2) {
-          const x = uvs[i];
-          const y = uvs[i + 1];
-          out[i] = x * mat.a + y * mat.c + mat.tx;
-          out[i + 1] = x * mat.b + y * mat.d + mat.ty;
-        }
-        return out;
-      }
-      update() {
-        const tex = this._texture;
-        this._updateID++;
-        const uvs = tex.uvs;
-        this.mapCoord.set(uvs.x1 - uvs.x0, uvs.y1 - uvs.y0, uvs.x3 - uvs.x0, uvs.y3 - uvs.y0, uvs.x0, uvs.y0);
-        const orig = tex.orig;
-        const trim = tex.trim;
-        if (trim) {
-          tempMat.set(
-            orig.width / trim.width,
-            0,
-            0,
-            orig.height / trim.height,
-            -trim.x / trim.width,
-            -trim.y / trim.height
-          );
-          this.mapCoord.append(tempMat);
-        }
-        const texBase = tex.source;
-        const frame = this.uClampFrame;
-        const margin = this.clampMargin / texBase._resolution;
-        const offset = this.clampOffset;
-        frame[0] = (tex.frame.x + margin + offset) / texBase.width;
-        frame[1] = (tex.frame.y + margin + offset) / texBase.height;
-        frame[2] = (tex.frame.x + tex.frame.width - margin + offset) / texBase.width;
-        frame[3] = (tex.frame.y + tex.frame.height - margin + offset) / texBase.height;
-        this.uClampOffset[0] = offset / texBase.pixelWidth;
-        this.uClampOffset[1] = offset / texBase.pixelHeight;
-        this.isSimple = tex.frame.width === texBase.width && tex.frame.height === texBase.height && tex.rotate === 0;
-        return true;
-      }
-    }
-
-    "use strict";
-    class Texture extends EventEmitter {
-      constructor({
-        source,
-        label,
-        frame,
-        orig,
-        trim,
-        defaultAnchor,
-        defaultBorders,
-        rotate
-      } = {}) {
-        var _a;
-        super();
-        /** unique id for this texture */
-        this.uid = uid("texture");
-        /** A uvs object based on the given frame and the texture source */
-        this.uvs = { x0: 0, y0: 0, x1: 0, y1: 0, x2: 0, y2: 0, x3: 0, y3: 0 };
-        /**
-         * This is the area of the BaseTexture image to actually copy to the Canvas / WebGL when rendering,
-         * irrespective of the actual frame size or placement (which can be influenced by trimmed texture atlases)
-         */
-        this.frame = new Rectangle();
-        /**
-         * Does this Texture have any frame data assigned to it?
-         *
-         * This mode is enabled automatically if no frame was passed inside constructor.
-         *
-         * In this mode texture is subscribed to baseTexture events, and fires `update` on any change.
-         *
-         * Beware, after loading or resize of baseTexture event can fired two times!
-         * If you want more control, subscribe on baseTexture itself.
-         * @example
-         * texture.on('update', () => {});
-         */
-        this.noFrame = false;
-        this.label = label;
-        this.source = (_a = source == null ? void 0 : source.source) != null ? _a : new TextureSource();
-        this.noFrame = !frame;
-        if (frame) {
-          this.frame.copyFrom(frame);
-        } else {
-          const { width, height } = this._source;
-          this.frame.width = width;
-          this.frame.height = height;
-        }
-        this.orig = orig || this.frame;
-        this.trim = trim;
-        this.rotate = rotate != null ? rotate : 0;
-        this.defaultAnchor = defaultAnchor;
-        this.defaultBorders = defaultBorders;
-        this.destroyed = false;
-        this.updateUvs();
-      }
-      /**
-       * Helper function that creates a returns Texture based on the source you provide.
-       * The source should be loaded and ready to go. If not its best to grab the asset using Assets.
-       * @param id - String or Source to create texture from
-       * @param skipCache - Skip adding the texture to the cache
-       * @returns The texture based on the Id provided
-       */
-      static from(id, skipCache = false) {
-        if (typeof id === "string") {
-          return Cache.get(id);
-        } else if (id instanceof TextureSource) {
-          return new Texture({ source: id });
-        }
-        return resourceToTexture(id, skipCache);
-      }
-      set source(value) {
-        if (this._source) {
-          this._source.off("resize", this.onUpdate, this);
-        }
-        this._source = value;
-        value.on("resize", this.onUpdate, this);
-        this.emit("update", this);
-      }
-      /** the underlying source of the texture (equivalent of baseTexture in v7) */
-      get source() {
-        return this._source;
-      }
-      /** returns a TextureMatrix instance for this texture. By default, that object is not created because its heavy. */
-      get textureMatrix() {
-        if (!this._textureMatrix) {
-          this._textureMatrix = new TextureMatrix(this);
-        }
-        return this._textureMatrix;
-      }
-      /** The width of the Texture in pixels. */
-      get width() {
-        return this.orig.width;
-      }
-      /** The height of the Texture in pixels. */
-      get height() {
-        return this.orig.height;
-      }
-      /** Call this function when you have modified the frame of this texture. */
-      updateUvs() {
-        const { uvs, frame } = this;
-        const { width, height } = this._source;
-        const nX = frame.x / width;
-        const nY = frame.y / height;
-        const nW = frame.width / width;
-        const nH = frame.height / height;
-        let rotate = this.rotate;
-        if (rotate) {
-          const w2 = nW / 2;
-          const h2 = nH / 2;
-          const cX = nX + w2;
-          const cY = nY + h2;
-          rotate = groupD8.add(rotate, groupD8.NW);
-          uvs.x0 = cX + w2 * groupD8.uX(rotate);
-          uvs.y0 = cY + h2 * groupD8.uY(rotate);
-          rotate = groupD8.add(rotate, 2);
-          uvs.x1 = cX + w2 * groupD8.uX(rotate);
-          uvs.y1 = cY + h2 * groupD8.uY(rotate);
-          rotate = groupD8.add(rotate, 2);
-          uvs.x2 = cX + w2 * groupD8.uX(rotate);
-          uvs.y2 = cY + h2 * groupD8.uY(rotate);
-          rotate = groupD8.add(rotate, 2);
-          uvs.x3 = cX + w2 * groupD8.uX(rotate);
-          uvs.y3 = cY + h2 * groupD8.uY(rotate);
-        } else {
-          uvs.x0 = nX;
-          uvs.y0 = nY;
-          uvs.x1 = nX + nW;
-          uvs.y1 = nY;
-          uvs.x2 = nX + nW;
-          uvs.y2 = nY + nH;
-          uvs.x3 = nX;
-          uvs.y3 = nY + nH;
-        }
-      }
-      /**
-       * Destroys this texture
-       * @param destroySource - Destroy the source when the texture is destroyed.
-       */
-      destroy(destroySource = false) {
-        if (this._source) {
-          if (destroySource) {
-            this._source.destroy();
-            this._source = null;
-          }
-        }
-        this._textureMatrix = null;
-        this.destroyed = true;
-        this.emit("destroy", this);
-        this.removeAllListeners();
-      }
-      /**
-       * @internal
-       */
-      onUpdate() {
-        if (this.noFrame) {
-          this.frame.width = this._source.width;
-          this.frame.height = this._source.height;
-        }
-        this.updateUvs();
-        this.emit("update", this);
-      }
-      /** @deprecated since 8.0.0 */
-      get baseTexture() {
-        deprecation(v8_0_0, "Texture.baseTexture is now Texture.source");
-        return this._source;
-      }
-    }
-    Texture.EMPTY = new Texture({
-      label: "EMPTY"
-    });
-    Texture.EMPTY.destroy = NOOP;
-    Texture.WHITE = new Texture({
-      source: new BufferImageSource({
-        resource: new Uint8Array([255, 255, 255, 255]),
-        width: 1,
-        height: 1,
-        alphaMode: "premultiply-alpha-on-upload"
-      }),
-      label: "WHITE"
-    });
-    Texture.WHITE.destroy = NOOP;
-
-    "use strict";
-    const _Spritesheet = class _Spritesheet {
-      /**
-       * @param texture - Reference to the source BaseTexture object.
-       * @param {object} data - Spritesheet image data.
-       */
-      constructor(texture, data) {
-        /** For multi-packed spritesheets, this contains a reference to all the other spritesheets it depends on. */
-        this.linkedSheets = [];
-        this._texture = texture instanceof Texture ? texture : null;
-        this.textureSource = texture.source;
-        this.textures = {};
-        this.animations = {};
-        this.data = data;
-        const metaResolution = parseFloat(data.meta.scale);
-        if (metaResolution) {
-          this.resolution = metaResolution;
-          texture.source.resolution = this.resolution;
-        } else {
-          this.resolution = texture.source._resolution;
-        }
-        this._frames = this.data.frames;
-        this._frameKeys = Object.keys(this._frames);
-        this._batchIndex = 0;
-        this._callback = null;
-      }
-      /**
-       * Parser spritesheet from loaded data. This is done asynchronously
-       * to prevent creating too many Texture within a single process.
-       */
-      parse() {
-        return new Promise((resolve) => {
-          this._callback = resolve;
-          this._batchIndex = 0;
-          if (this._frameKeys.length <= _Spritesheet.BATCH_SIZE) {
-            this._processFrames(0);
-            this._processAnimations();
-            this._parseComplete();
-          } else {
-            this._nextBatch();
-          }
-        });
-      }
-      /**
-       * Process a batch of frames
-       * @param initialFrameIndex - The index of frame to start.
-       */
-      _processFrames(initialFrameIndex) {
-        let frameIndex = initialFrameIndex;
-        const maxFrames = _Spritesheet.BATCH_SIZE;
-        while (frameIndex - initialFrameIndex < maxFrames && frameIndex < this._frameKeys.length) {
-          const i = this._frameKeys[frameIndex];
-          const data = this._frames[i];
-          const rect = data.frame;
-          if (rect) {
-            let frame = null;
-            let trim = null;
-            const sourceSize = data.trimmed !== false && data.sourceSize ? data.sourceSize : data.frame;
-            const orig = new Rectangle(
-              0,
-              0,
-              Math.floor(sourceSize.w) / this.resolution,
-              Math.floor(sourceSize.h) / this.resolution
-            );
-            if (data.rotated) {
-              frame = new Rectangle(
-                Math.floor(rect.x) / this.resolution,
-                Math.floor(rect.y) / this.resolution,
-                Math.floor(rect.h) / this.resolution,
-                Math.floor(rect.w) / this.resolution
-              );
-            } else {
-              frame = new Rectangle(
-                Math.floor(rect.x) / this.resolution,
-                Math.floor(rect.y) / this.resolution,
-                Math.floor(rect.w) / this.resolution,
-                Math.floor(rect.h) / this.resolution
-              );
-            }
-            if (data.trimmed !== false && data.spriteSourceSize) {
-              trim = new Rectangle(
-                Math.floor(data.spriteSourceSize.x) / this.resolution,
-                Math.floor(data.spriteSourceSize.y) / this.resolution,
-                Math.floor(rect.w) / this.resolution,
-                Math.floor(rect.h) / this.resolution
-              );
-            }
-            this.textures[i] = new Texture({
-              source: this.textureSource,
-              frame,
-              orig,
-              trim,
-              rotate: data.rotated ? 2 : 0,
-              defaultAnchor: data.anchor,
-              defaultBorders: data.borders,
-              label: i.toString()
-            });
-          }
-          frameIndex++;
-        }
-      }
-      /** Parse animations config. */
-      _processAnimations() {
-        const animations = this.data.animations || {};
-        for (const animName in animations) {
-          this.animations[animName] = [];
-          for (let i = 0; i < animations[animName].length; i++) {
-            const frameName = animations[animName][i];
-            this.animations[animName].push(this.textures[frameName]);
-          }
-        }
-      }
-      /** The parse has completed. */
-      _parseComplete() {
-        const callback = this._callback;
-        this._callback = null;
-        this._batchIndex = 0;
-        callback.call(this, this.textures);
-      }
-      /** Begin the next batch of textures. */
-      _nextBatch() {
-        this._processFrames(this._batchIndex * _Spritesheet.BATCH_SIZE);
-        this._batchIndex++;
-        setTimeout(() => {
-          if (this._batchIndex * _Spritesheet.BATCH_SIZE < this._frameKeys.length) {
-            this._nextBatch();
-          } else {
-            this._processAnimations();
-            this._parseComplete();
-          }
-        }, 0);
-      }
-      /**
-       * Destroy Spritesheet and don't use after this.
-       * @param {boolean} [destroyBase=false] - Whether to destroy the base texture as well
-       */
-      destroy(destroyBase = false) {
-        var _a;
-        for (const i in this.textures) {
-          this.textures[i].destroy();
-        }
-        this._frames = null;
-        this._frameKeys = null;
-        this.data = null;
-        this.textures = null;
-        if (destroyBase) {
-          (_a = this._texture) == null ? void 0 : _a.destroy();
-          this.textureSource.destroy();
-        }
-        this._texture = null;
-        this.textureSource = null;
-        this.linkedSheets = [];
-      }
-    };
-    /** The maximum number of Textures to build per process. */
-    _Spritesheet.BATCH_SIZE = 1e3;
-    let Spritesheet = _Spritesheet;
-
-    "use strict";
-    const validImages = ["jpg", "png", "jpeg", "avif", "webp"];
-    function getCacheableAssets(keys, asset, ignoreMultiPack) {
-      const out = {};
-      keys.forEach((key) => {
-        out[key] = asset;
-      });
-      Object.keys(asset.textures).forEach((key) => {
-        out[key] = asset.textures[key];
-      });
-      if (!ignoreMultiPack) {
-        const basePath = path.dirname(keys[0]);
-        asset.linkedSheets.forEach((item, i) => {
-          const out2 = getCacheableAssets([`${basePath}/${asset.data.meta.related_multi_packs[i]}`], item, true);
-          Object.assign(out, out2);
-        });
-      }
-      return out;
-    }
-    const spritesheetAsset = {
-      extension: ExtensionType.Asset,
-      /** Handle the caching of the related Spritesheet Textures */
-      cache: {
-        test: (asset) => asset instanceof Spritesheet,
-        getCacheableAssets: (keys, asset) => getCacheableAssets(keys, asset, false)
-      },
-      /** Resolve the resolution of the asset. */
-      resolver: {
-        test: (value) => {
-          const tempURL = value.split("?")[0];
-          const split = tempURL.split(".");
-          const extension = split.pop();
-          const format = split.pop();
-          return extension === "json" && validImages.includes(format);
-        },
-        parse: (value) => {
-          var _a, _b;
-          const split = value.split(".");
-          return {
-            resolution: parseFloat((_b = (_a = Resolver.RETINA_PREFIX.exec(value)) == null ? void 0 : _a[1]) != null ? _b : "1"),
-            format: split[split.length - 2],
-            src: value
-          };
-        }
-      },
-      /**
-       * Loader plugin that parses sprite sheets!
-       * once the JSON has been loaded this checks to see if the JSON is spritesheet data.
-       * If it is, we load the spritesheets image and parse the data into Spritesheet
-       * All textures in the sprite sheet are then added to the cache
-       */
-      loader: {
-        name: "spritesheetLoader",
-        extension: {
-          type: ExtensionType.LoadParser,
-          priority: LoaderParserPriority.Normal
-        },
-        async testParse(asset, options) {
-          return path.extname(options.src).toLowerCase() === ".json" && !!asset.frames;
-        },
-        async parse(asset, options, loader) {
-          var _a, _b, _c;
-          const {
-            texture: imageTexture,
-            // if user need to use preloaded texture
-            imageFilename
-            // if user need to use custom filename (not from jsonFile.meta.image)
-          } = (_a = options == null ? void 0 : options.data) != null ? _a : {};
-          let basePath = path.dirname(options.src);
-          if (basePath && basePath.lastIndexOf("/") !== basePath.length - 1) {
-            basePath += "/";
-          }
-          let texture;
-          if (imageTexture instanceof Texture) {
-            texture = imageTexture;
-          } else {
-            const imagePath = copySearchParams(basePath + (imageFilename != null ? imageFilename : asset.meta.image), options.src);
-            const assets = await loader.load([imagePath]);
-            texture = assets[imagePath];
-          }
-          const spritesheet = new Spritesheet(
-            texture.source,
-            asset
-          );
-          await spritesheet.parse();
-          const multiPacks = (_b = asset == null ? void 0 : asset.meta) == null ? void 0 : _b.related_multi_packs;
-          if (Array.isArray(multiPacks)) {
-            const promises = [];
-            for (const item of multiPacks) {
-              if (typeof item !== "string") {
-                continue;
-              }
-              let itemUrl = basePath + item;
-              if ((_c = options.data) == null ? void 0 : _c.ignoreMultiPack) {
-                continue;
-              }
-              itemUrl = copySearchParams(itemUrl, options.src);
-              promises.push(loader.load({
-                src: itemUrl,
-                data: {
-                  ignoreMultiPack: true
-                }
-              }));
-            }
-            const res = await Promise.all(promises);
-            spritesheet.linkedSheets = res;
-            res.forEach((item) => {
-              item.linkedSheets = [spritesheet].concat(spritesheet.linkedSheets.filter((sp) => sp !== item));
-            });
-          }
-          return spritesheet;
-        },
-        unload(spritesheet) {
-          spritesheet.destroy(true);
-        }
-      }
-    };
-
-    "use strict";
-    extensions.add(spritesheetAsset);
-
-    "use strict";
-    function updateQuadBounds(bounds, anchor, texture, padding) {
-      const { width, height } = texture.orig;
-      const trim = texture.trim;
-      if (trim) {
-        const sourceWidth = trim.width;
-        const sourceHeight = trim.height;
-        bounds.minX = trim.x - anchor._x * width - padding;
-        bounds.maxX = bounds.minX + sourceWidth;
-        bounds.minY = trim.y - anchor._y * height - padding;
-        bounds.maxY = bounds.minY + sourceHeight;
-      } else {
-        bounds.minX = -anchor._x * width - padding;
-        bounds.maxX = bounds.minX + width;
-        bounds.minY = -anchor._y * height - padding;
-        bounds.maxY = bounds.minY + height;
-      }
-      return;
-    }
 
     "use strict";
     var __defProp$P = Object.defineProperty;
@@ -23292,11 +25552,9 @@ ${parts.join("\n")}
 
     "use strict";
 
-    var browserAll = {
+    var webworkerAll = {
         __proto__: null
     };
-
-    "use strict";
 
     "use strict";
     const environments = [];
@@ -26162,23 +28420,17 @@ ${e}`);
     "use strict";
 
     "use strict";
-    const browserExt = {
+    const webworkerExt = {
       extension: {
         type: ExtensionType.Environment,
-        name: "browser",
-        priority: -1
+        name: "webworker",
+        priority: 0
       },
-      test: () => true,
+      test: () => typeof self !== "undefined" && self.WorkerGlobalScope !== void 0,
       load: async () => {
-        await Promise.resolve().then(function () { return browserAll; });
+        await Promise.resolve().then(function () { return webworkerAll; });
       }
     };
-
-    "use strict";
-
-    "use strict";
-
-    "use strict";
 
     "use strict";
 
@@ -38702,6 +40954,136 @@ ${src}`;
 
     "use strict";
 
+    var appleIphone = /iPhone/i;
+    var appleIpod = /iPod/i;
+    var appleTablet = /iPad/i;
+    var appleUniversal = /\biOS-universal(?:.+)Mac\b/i;
+    var androidPhone = /\bAndroid(?:.+)Mobile\b/i;
+    var androidTablet = /Android/i;
+    var amazonPhone = /(?:SD4930UR|\bSilk(?:.+)Mobile\b)/i;
+    var amazonTablet = /Silk/i;
+    var windowsPhone = /Windows Phone/i;
+    var windowsTablet = /\bWindows(?:.+)ARM\b/i;
+    var otherBlackBerry = /BlackBerry/i;
+    var otherBlackBerry10 = /BB10/i;
+    var otherOpera = /Opera Mini/i;
+    var otherChrome = /\b(CriOS|Chrome)(?:.+)Mobile/i;
+    var otherFirefox = /Mobile(?:.+)Firefox\b/i;
+    var isAppleTabletOnIos13 = function (navigator) {
+        return (typeof navigator !== 'undefined' &&
+            navigator.platform === 'MacIntel' &&
+            typeof navigator.maxTouchPoints === 'number' &&
+            navigator.maxTouchPoints > 1 &&
+            typeof MSStream === 'undefined');
+    };
+    function createMatch(userAgent) {
+        return function (regex) { return regex.test(userAgent); };
+    }
+    function isMobile$1(param) {
+        var nav = {
+            userAgent: '',
+            platform: '',
+            maxTouchPoints: 0
+        };
+        if (!param && typeof navigator !== 'undefined') {
+            nav = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                maxTouchPoints: navigator.maxTouchPoints || 0
+            };
+        }
+        else if (typeof param === 'string') {
+            nav.userAgent = param;
+        }
+        else if (param && param.userAgent) {
+            nav = {
+                userAgent: param.userAgent,
+                platform: param.platform,
+                maxTouchPoints: param.maxTouchPoints || 0
+            };
+        }
+        var userAgent = nav.userAgent;
+        var tmp = userAgent.split('[FBAN');
+        if (typeof tmp[1] !== 'undefined') {
+            userAgent = tmp[0];
+        }
+        tmp = userAgent.split('Twitter');
+        if (typeof tmp[1] !== 'undefined') {
+            userAgent = tmp[0];
+        }
+        var match = createMatch(userAgent);
+        var result = {
+            apple: {
+                phone: match(appleIphone) && !match(windowsPhone),
+                ipod: match(appleIpod),
+                tablet: !match(appleIphone) &&
+                    (match(appleTablet) || isAppleTabletOnIos13(nav)) &&
+                    !match(windowsPhone),
+                universal: match(appleUniversal),
+                device: (match(appleIphone) ||
+                    match(appleIpod) ||
+                    match(appleTablet) ||
+                    match(appleUniversal) ||
+                    isAppleTabletOnIos13(nav)) &&
+                    !match(windowsPhone)
+            },
+            amazon: {
+                phone: match(amazonPhone),
+                tablet: !match(amazonPhone) && match(amazonTablet),
+                device: match(amazonPhone) || match(amazonTablet)
+            },
+            android: {
+                phone: (!match(windowsPhone) && match(amazonPhone)) ||
+                    (!match(windowsPhone) && match(androidPhone)),
+                tablet: !match(windowsPhone) &&
+                    !match(amazonPhone) &&
+                    !match(androidPhone) &&
+                    (match(amazonTablet) || match(androidTablet)),
+                device: (!match(windowsPhone) &&
+                    (match(amazonPhone) ||
+                        match(amazonTablet) ||
+                        match(androidPhone) ||
+                        match(androidTablet))) ||
+                    match(/\bokhttp\b/i)
+            },
+            windows: {
+                phone: match(windowsPhone),
+                tablet: match(windowsTablet),
+                device: match(windowsPhone) || match(windowsTablet)
+            },
+            other: {
+                blackberry: match(otherBlackBerry),
+                blackberry10: match(otherBlackBerry10),
+                opera: match(otherOpera),
+                firefox: match(otherFirefox),
+                chrome: match(otherChrome),
+                device: match(otherBlackBerry) ||
+                    match(otherBlackBerry10) ||
+                    match(otherOpera) ||
+                    match(otherFirefox) ||
+                    match(otherChrome)
+            },
+            any: false,
+            phone: false,
+            tablet: false
+        };
+        result.any =
+            result.apple.device ||
+                result.android.device ||
+                result.windows.device ||
+                result.other.device;
+        result.phone =
+            result.apple.phone || result.android.phone || result.windows.phone;
+        result.tablet =
+            result.apple.tablet || result.android.tablet || result.windows.tablet;
+        return result;
+    }
+
+    "use strict";
+    var _a;
+    const isMobileCall = (_a = isMobile$1.default) != null ? _a : isMobile$1;
+    const isMobile = isMobileCall(globalThis.navigator);
+
     "use strict";
     const DATA_URI = /^\s*data:(?:([\w-]+)\/([\w+.-]+))?(?:;charset=([\w-]+))?(?:;(base64))?,(.*)/i;
 
@@ -38810,10 +41192,10 @@ ${src}`;
     "use strict";
 
     "use strict";
+    DOMAdapter.set(WebWorkerAdapter);
 
     exports.AbstractBitmapFont = AbstractBitmapFont;
     exports.AbstractRenderer = AbstractRenderer;
-    exports.AccessibilitySystem = AccessibilitySystem;
     exports.AlphaFilter = AlphaFilter;
     exports.AlphaMask = AlphaMask;
     exports.AlphaMaskPipe = AlphaMaskPipe;
@@ -38845,7 +41227,6 @@ ${src}`;
     exports.BlurFilter = BlurFilter;
     exports.BlurFilterPass = BlurFilterPass;
     exports.Bounds = Bounds;
-    exports.BrowserAdapter = BrowserAdapter;
     exports.Buffer = Buffer;
     exports.BufferImageSource = BufferImageSource;
     exports.BufferResource = BufferResource;
@@ -38876,17 +41257,9 @@ ${src}`;
     exports.DisplacementFilter = DisplacementFilter;
     exports.DynamicBitmapFont = DynamicBitmapFont;
     exports.Ellipse = Ellipse;
-    exports.EventBoundary = EventBoundary;
     exports.EventEmitter = EventEmitter;
-    exports.EventSystem = EventSystem;
-    exports.EventsTicker = EventsTicker;
     exports.ExtensionType = ExtensionType;
     exports.ExtractSystem = ExtractSystem;
-    exports.FederatedContainer = FederatedContainer;
-    exports.FederatedEvent = FederatedEvent;
-    exports.FederatedMouseEvent = FederatedMouseEvent;
-    exports.FederatedPointerEvent = FederatedPointerEvent;
-    exports.FederatedWheelEvent = FederatedWheelEvent;
     exports.FillGradient = FillGradient;
     exports.FillPattern = FillPattern;
     exports.Filter = Filter;
@@ -39063,10 +41436,10 @@ ${src}`;
     exports.WRAP_MODES = WRAP_MODES;
     exports.WebGLRenderer = WebGLRenderer;
     exports.WebGPURenderer = WebGPURenderer;
+    exports.WebWorkerAdapter = WebWorkerAdapter;
     exports.WorkerManager = WorkerManager;
     exports._getGlobalBounds = _getGlobalBounds;
     exports._getGlobalBoundsRecursive = _getGlobalBoundsRecursive;
-    exports.accessibilityTarget = accessibilityTarget;
     exports.addBits = addBits;
     exports.addMaskBounds = addMaskBounds;
     exports.addMaskLocalBounds = addMaskLocalBounds;
@@ -39091,7 +41464,6 @@ ${src}`;
     exports.blockDataMap = blockDataMap;
     exports.blurTemplateWgsl = source$4;
     exports.boundsPool = boundsPool;
-    exports.browserExt = browserExt;
     exports.buildAdaptiveBezier = buildAdaptiveBezier;
     exports.buildAdaptiveQuadratic = buildAdaptiveQuadratic;
     exports.buildArc = buildArc;
@@ -39359,9 +41731,10 @@ ${src}`;
     exports.viewportFromFrame = viewportFromFrame;
     exports.vkFormatToGPUFormat = vkFormatToGPUFormat;
     exports.warn = warn;
+    exports.webworkerExt = webworkerExt;
     exports.wrapModeToGlAddress = wrapModeToGlAddress;
 
     return exports;
 
 })({});
-//# sourceMappingURL=pixi.js.map
+//# sourceMappingURL=webworker.js.map
